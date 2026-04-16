@@ -2,20 +2,27 @@
 @import "tailwindcss";
 
 :root {
-  --accent: #f59e0b;
-  --accent-soft: #fbbf24;
-  --trend-up: #34d399;
-  --trend-down: #fb7185;
+  --accent: #0052ff;
+  --accent-soft: #578bfa;
+  --trend-up: #0ecb81;
+  --trend-down: #f6465d;
 
-  --bg-main: #020617;     /* slate-950 */
-  --bg-panel: #0f172a;    /* slate-900 */
-  --bg-card: #111827;     /* gray-900 */
+  --color-brand: #0052ff;
+  --color-brand-hover: #578bfa;
+  --color-success: #0ecb81;
+  --color-danger: #f6465d;
+  --color-warning: #f0b90b;
 
-  --text-main: #e2e8f0;   /* slate-200 */
-  --text-muted: #94a3b8;  /* slate-400 */
+  --bg-main: #0a0b0d;
+  --bg-panel: #12151d;
+  --bg-card: #1a1f2b;
+  --bg-surface-soft: rgba(247, 247, 247, 0.04);
 
-  --border: #1e293b;      /* slate-800 */
-  --border-soft: #334155; /* slate-700 */
+  --text-main: #f5f7ff;
+  --text-muted: #96a2be;
+
+  --border: rgba(91, 97, 110, 0.34);
+  --border-soft: rgba(91, 97, 110, 0.2);
 }
 
 * {
@@ -183,14 +190,14 @@ input:focus,
 button:focus-visible,
 textarea:focus,
 select:focus {
-  outline: 2px solid rgba(148, 163, 184, 0.5);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(87, 139, 250, 0.18), 0 0 0 4px rgba(0, 82, 255, 0.22);
 }
 
 button,
 a,
 [role="button"] {
-  transition: all 0.18s ease;
+  transition: all 0.2s ease;
 }
 
 .line-clamp-2 {
@@ -236,3 +243,45 @@ a,
 .dot-green { background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.45); }
 .dot-red { background: #fb7185; box-shadow: 0 0 6px rgba(251, 113, 133, 0.45); }
 .dot-yellow { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.45); }
+
+/* ── Coinbase-inspired semantic helpers ── */
+.coinbase-shell {
+  background:
+    radial-gradient(circle at 8% -20%, rgba(0, 82, 255, 0.13), transparent 35%),
+    radial-gradient(circle at 92% -10%, rgba(87, 139, 250, 0.08), transparent 32%),
+    var(--bg-main);
+}
+
+.coinbase-surface {
+  background: linear-gradient(160deg, rgba(21, 25, 34, 0.96), rgba(13, 16, 23, 0.92));
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.coinbase-surface-soft {
+  background: linear-gradient(180deg, rgba(22, 27, 39, 0.9), rgba(14, 18, 27, 0.82));
+  border: 1px solid var(--border-soft);
+}
+
+.coinbase-pill-btn {
+  border-radius: 56px;
+  border: 1px solid var(--border);
+}
+
+.coinbase-brand-outline {
+  border: 1px solid rgba(0, 82, 255, 0.45);
+}
+
+.coinbase-data-head {
+  background: linear-gradient(180deg, rgba(22, 28, 40, 0.96), rgba(14, 19, 30, 0.93));
+  border-bottom: 1px solid var(--border);
+}
+
+.coinbase-data-row {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.coinbase-data-row:hover {
+  background: rgba(87, 139, 250, 0.08);
+  box-shadow: inset 2px 0 0 var(--color-brand);
+}

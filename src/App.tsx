@@ -322,9 +322,16 @@ export default function App() {
 
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-200 select-none">
+    <div className="coinbase-shell flex h-screen flex-col overflow-hidden text-[var(--text-main)] select-none">
       <Toaster position="top-right" toastOptions={{
-        style: { background: '#0f172a', color: '#e2e8f0', border: '1px solid #334155', fontSize: '13px', borderRadius: '12px' },
+        style: {
+          background: '#141926',
+          color: '#f5f7ff',
+          border: '1px solid rgba(91,97,110,0.34)',
+          fontSize: '13px',
+          borderRadius: '16px',
+          boxShadow: '0 12px 28px rgba(0,0,0,0.35)',
+        },
       }} />
 
       {/* Modals */}
@@ -332,43 +339,43 @@ export default function App() {
       <AutoTradePanel />
 
       {/* ── Header ── */}
-      <header className="flex h-14 shrink-0 items-center gap-3 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-slate-800 bg-slate-950/95 px-3 backdrop-blur-sm z-40">
+      <header className="z-40 flex h-16 shrink-0 items-center gap-3 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-[rgba(91,97,110,0.25)] bg-[#0d1119]/92 px-4 backdrop-blur-xl">
         {/* Logo */}
-        <div className="flex items-center gap-2 shrink-0 mr-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm shadow-amber-900/30">
-            <span className="text-slate-950 font-black text-sm">M</span>
+        <div className="mr-3 flex shrink-0 items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0052ff] to-[#578bfa] shadow-[0_10px_24px_rgba(0,82,255,0.35)]">
+            <span className="text-sm font-black text-white">M</span>
           </div>
           <div>
-            <div className="text-sm font-extrabold text-slate-100 leading-none">MEXC <span className="text-amber-400">Pro</span></div>
-            <div className="text-[11px] text-slate-500 leading-none mt-1">Futures Terminal v2</div>
+            <div className="text-[15px] font-semibold leading-none tracking-tight text-[#f5f7ff]">MEXC <span className="text-[#6da0ff]">Pro</span></div>
+            <div className="mt-1 text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-[#96a2be]">Futures Terminal v2</div>
           </div>
         </div>
 
         {/* Dang xem badge */}
-        <div className="hidden md:flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-sm shrink-0">
-          <span className="text-slate-400">Đang xem:</span>
-          <span className="font-semibold text-slate-100">{selectedSymbol.replace('_', '/')}</span>
+        <div className="hidden md:flex items-center gap-2 rounded-2xl border border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.04)] px-3.5 py-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] shrink-0">
+          <span className="text-[#96a2be]">Đang xem:</span>
+          <span className="font-semibold text-[#f5f7ff] tracking-tight">{selectedSymbol.replace('_', '/')}</span>
           {currentSignal && currentSignal.type !== 'NEUTRAL' && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-              currentSignal.type === 'LONG' ? 'border-emerald-800/60 bg-emerald-950/50 text-emerald-400' : 'border-rose-800/60 bg-rose-950/50 text-rose-400'
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
+              currentSignal.type === 'LONG' ? 'border-[rgba(14,203,129,0.45)] bg-[rgba(14,203,129,0.12)] text-[#8ef3c4]' : 'border-[rgba(246,70,93,0.45)] bg-[rgba(246,70,93,0.12)] text-[#ff9fb0]'
             }`}>{currentSignal.type}</span>
           )}
         </div>
 
         {/* Sentiment pill */}
-        <div className="hidden lg:flex items-center gap-2 text-sm rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5 shrink-0">
+        <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.04)] px-3.5 py-2 text-sm shrink-0">
           <div className="scale-110">{sentimentIcon}</div>
-          <span className="text-slate-300">{marketSentiment}</span>
+          <span className="font-medium text-[#c6d3eb]">{marketSentiment}</span>
         </div>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-3 ml-6 shrink-0">
+        <nav className="ml-6 hidden shrink-0 items-center gap-2.5 md:flex">
           {navItems.map(({ id, icon: Icon, label }) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              className={`coinbase-pill-btn flex items-center gap-2 px-3.5 py-2 text-sm font-semibold tracking-[0.01em] ${
                 activeTab === id
-                  ? 'border-slate-700 bg-slate-800 text-slate-100'
-                  : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900 hover:text-slate-200'
+                  ? 'border-[rgba(0,82,255,0.5)] bg-[rgba(0,82,255,0.16)] text-[#e6efff] shadow-[inset_0_0_0_1px_rgba(0,82,255,0.22)]'
+                  : 'border-[rgba(91,97,110,0.24)] text-[#b2bfd8] hover:border-[rgba(87,139,250,0.45)] hover:bg-[rgba(87,139,250,0.12)] hover:text-[#f0f5ff]'
               }`}>
               <Icon className="w-5 h-5" />
               {label}
@@ -377,15 +384,15 @@ export default function App() {
         </nav>
 
         {/* Right controls */}
-        <div className="ml-auto flex items-center gap-2.5 shrink-0 pl-3">
+        <div className="ml-auto flex shrink-0 items-center gap-2.5 pl-3">
           {/* API Status button */}
           <button onClick={() => setApiModalOpen(true)}
-            className={`hidden md:flex items-center gap-2 text-sm px-3 py-2 rounded-lg border transition-colors font-medium ${
+            className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-3.5 py-2 font-semibold tracking-[0.01em] ${
               isApiConnected
-                ? 'bg-emerald-950/30 border-emerald-800/60 text-emerald-400'
+                ? 'bg-[rgba(14,203,129,0.12)] border-[rgba(14,203,129,0.42)] text-[#81f0bd]'
                 : credentials
-                ? 'bg-amber-950/30 border-amber-800/60 text-amber-400'
-                : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                ? 'bg-[rgba(240,185,11,0.12)] border-[rgba(240,185,11,0.4)] text-[#ffd76b]'
+                : 'bg-[rgba(247,247,247,0.03)] border-[rgba(91,97,110,0.3)] text-[#c7d2ea] hover:bg-[rgba(87,139,250,0.12)] hover:border-[rgba(87,139,250,0.45)]'
             }`}>
             <Key className="w-4 h-4" />
             {isApiConnected ? 'Connected' : credentials ? 'API Saved' : 'API Keys'}
@@ -394,12 +401,12 @@ export default function App() {
 
           {/* Auto-trade button */}
           <button onClick={() => setAutoTradePanelOpen(true)}
-            className={`hidden md:flex items-center gap-2 text-sm px-3 py-2 rounded-lg border transition-colors font-medium ${
+            className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-3.5 py-2 font-semibold tracking-[0.01em] ${
               autoTradeBadge
                 ? autoTradeMode === 'live'
-                  ? 'bg-rose-950/30 border-rose-800/60 text-rose-400'
-                  : 'bg-amber-950/30 border-amber-800/60 text-amber-400'
-                : 'border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  ? 'bg-[rgba(246,70,93,0.14)] border-[rgba(246,70,93,0.45)] text-[#ff9cab]'
+                  : 'bg-[rgba(240,185,11,0.13)] border-[rgba(240,185,11,0.42)] text-[#ffd46a]'
+                : 'border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.03)] text-[#c7d2ea] hover:bg-[rgba(87,139,250,0.12)] hover:border-[rgba(87,139,250,0.45)]'
             }`}>
             <Bot className="w-4 h-4" />
             <span className={autoTradeMode !== 'off' ? undefined : 'hidden lg:inline'}>
@@ -409,17 +416,17 @@ export default function App() {
           </button>
 
           {/* Connection */}
-          <div className={`hidden lg:flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
+          <div className={`hidden lg:flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium ${
             credentials
-              ? isApiConnected ? 'border-emerald-800/50 text-emerald-400 bg-emerald-950/20' : 'border-amber-800/50 text-amber-400 bg-amber-950/20'
-              : 'border-slate-800 text-slate-500 bg-slate-900/60'
+              ? isApiConnected ? 'border-[rgba(14,203,129,0.4)] text-[#82efbe] bg-[rgba(14,203,129,0.1)]' : 'border-[rgba(240,185,11,0.4)] text-[#ffd673] bg-[rgba(240,185,11,0.1)]'
+              : 'border-[rgba(91,97,110,0.3)] text-[#96a2be] bg-[rgba(247,247,247,0.03)]'
           }`}>
             {credentials ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             {credentials ? (isApiConnected ? 'API Connected' : 'API Status') : 'No API Key'}
           </div>
 
           {/* Mobile menu */}
-          <button className="md:hidden text-slate-400 hover:text-slate-200 p-1" onClick={() => setMobileMenuOpen(v => !v)}>
+          <button className="p-1.5 text-[#9aa7c2] transition-colors hover:text-[#f5f7ff] md:hidden" onClick={() => setMobileMenuOpen(v => !v)}>
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -427,29 +434,29 @@ export default function App() {
 
       {/* Mobile nav */}
       {mobileMenuOpen && (
-        <div className="md:hidden flex shrink-0 gap-1 overflow-x-auto border-b border-slate-800 bg-slate-900/70 px-2 py-1.5">
+        <div className="md:hidden flex shrink-0 gap-1.5 overflow-x-auto border-b border-[rgba(91,97,110,0.24)] bg-[#101521]/95 px-2.5 py-2 backdrop-blur-xl">
           {navItems.map(({ id, icon: Icon, label }) => (
             <button key={id} onClick={() => { setActiveTab(id); setMobileMenuOpen(false); }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap shrink-0 border transition-colors ${
-                activeTab === id ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-transparent text-slate-400 hover:border-slate-700 hover:bg-slate-800'
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
+                activeTab === id ? 'border-[rgba(0,82,255,0.48)] bg-[rgba(0,82,255,0.16)] text-[#e7efff]' : 'border-[rgba(91,97,110,0.28)] text-[#aebbd6] hover:border-[rgba(87,139,250,0.45)] hover:bg-[rgba(87,139,250,0.1)]'
               }`}>
               <Icon className="w-3 h-3" />{label}
             </button>
           ))}
           <button onClick={() => setApiModalOpen(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs border border-slate-700 bg-slate-800 text-slate-200 shrink-0 hover:bg-slate-700">
+            className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.04)] px-3 py-1.5 text-xs text-[#d5def2] hover:border-[rgba(87,139,250,0.45)] hover:bg-[rgba(87,139,250,0.12)]">
             <Key className="w-3 h-3" /> API
           </button>
         </div>
       )}
 
       {/* ── Main content ── */}
-      <div ref={appMainLayoutRef} className="flex flex-1 min-h-0 overflow-hidden bg-slate-950">
+      <div ref={appMainLayoutRef} className="flex flex-1 min-h-0 overflow-hidden bg-transparent">
 
         {/* LEFT: Coin sidebar */}
         <div
           style={sidebarOpen ? { width: `${sidebarWidth}px`, minWidth: '250px' } : { width: 0 }}
-          className={`shrink-0 border-r border-slate-800 bg-slate-900/60 transition-[width] duration-200 overflow-hidden ${sidebarOpen ? '' : 'w-0'}`}
+          className={`coinbase-surface shrink-0 border-r border-[rgba(91,97,110,0.2)] transition-[width] duration-200 overflow-hidden ${sidebarOpen ? '' : 'w-0'}`}
         >
           <CoinList />
         </div>
@@ -457,28 +464,28 @@ export default function App() {
         {sidebarOpen && (
           <div
             onMouseDown={() => setDragging('sidebar-width')}
-            className="w-1.5 shrink-0 cursor-col-resize bg-slate-900 hover:bg-slate-700 transition-colors"
+            className="w-1.5 shrink-0 cursor-col-resize bg-[#0f141e] transition-colors hover:bg-[rgba(87,139,250,0.45)]"
             title="Kéo để đổi kích thước Coin List"
           />
         )}
 
         {/* Toggle */}
         <button onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="shrink-0 w-3.5 border-r border-slate-800 bg-slate-900/80 hover:bg-slate-800 flex items-center justify-center transition-colors">
+          className="flex w-4 shrink-0 items-center justify-center border-r border-[rgba(91,97,110,0.25)] bg-[#0d121b]/85 transition-colors hover:bg-[rgba(87,139,250,0.16)]">
           {sidebarOpen ? <ChevronLeft className="w-3 h-3 text-slate-500" /> : <ChevronRight className="w-3 h-3 text-slate-500" />}
         </button>
 
         {/* CENTER + RIGHT */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-slate-950">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-transparent">
 
           {/* ── CHART tab ── */}
           {activeTab === 'chart' && (
-            <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2 gap-2">
-              <div className="shrink-0 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/60">
+            <div className="flex flex-1 min-h-0 flex-col overflow-hidden gap-2.5 p-3">
+              <div className="coinbase-surface-soft shrink-0 overflow-hidden rounded-2xl">
                 <TickerBar />
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
+              <div className="coinbase-surface flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
                 <div className="flex-1 min-h-0 overflow-hidden">
                   <div ref={chartMainSplitRef} className="flex h-full min-h-0 overflow-hidden">
                     {/* Chart area */}
@@ -489,7 +496,7 @@ export default function App() {
                     {/* Resize handle: chart vs right panel */}
                     <div
                       onMouseDown={() => setDragging('chart-right-width')}
-                      className="w-1.5 shrink-0 cursor-col-resize bg-slate-900 hover:bg-slate-700 transition-colors"
+                      className="w-1.5 shrink-0 cursor-col-resize bg-[#101722] transition-colors hover:bg-[rgba(87,139,250,0.45)]"
                       title="Kéo để đổi kích thước panel"
                     />
 
@@ -497,22 +504,22 @@ export default function App() {
                     <div
                       ref={chartRightPanelRef}
                       style={{ width: `${chartRightWidth}px` }}
-                      className="shrink-0 border-l border-slate-800 flex flex-col min-w-0 bg-slate-900/70"
+                      className="shrink-0 border-l border-[rgba(91,97,110,0.25)] flex flex-col min-w-0 bg-[rgba(247,247,247,0.03)]"
                     >
                       {/* Order Book — top */}
-                      <div className="flex-1 min-h-[180px] overflow-hidden border-b border-slate-800">
+                      <div className="flex-1 min-h-[180px] overflow-hidden border-b border-[rgba(91,97,110,0.25)]">
                         <OrderBook />
                       </div>
 
                       {/* Resize handle: orderbook vs order form */}
                       <div
                         onMouseDown={() => setDragging('chart-right-height')}
-                        className="h-1.5 shrink-0 cursor-row-resize bg-slate-900 hover:bg-slate-700 transition-colors"
+                        className="h-1.5 shrink-0 cursor-row-resize bg-[#101722] transition-colors hover:bg-[rgba(87,139,250,0.45)]"
                         title="Kéo để đổi chiều cao Order Form"
                       />
 
                       {/* Order Form — bottom */}
-                      <div style={{ height: `${chartSignalHeight}px` }} className="shrink-0 overflow-hidden border-t border-slate-800">
+                      <div style={{ height: `${chartSignalHeight}px` }} className="shrink-0 overflow-hidden border-t border-[rgba(91,97,110,0.24)]">
                         <div className="h-full overflow-y-auto">
                           <OrderPanel prefillSignal={prefillSignal} />
                         </div>
@@ -521,7 +528,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="h-[30%] min-h-[220px] overflow-y-auto border-t border-slate-800 bg-slate-900/55">
+                <div className="h-[30%] min-h-[220px] overflow-y-auto border-t border-[rgba(91,97,110,0.24)] bg-[rgba(247,247,247,0.02)]">
                   <PendingOrdersPanel />
                 </div>
               </div>
@@ -531,15 +538,15 @@ export default function App() {
           {/* ── SIGNALS tab ── */}
           {activeTab === 'signals' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="px-4 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/70">
+              <div className="coinbase-surface-soft px-4 py-2.5 flex items-center gap-2.5 shrink-0 border-b border-[rgba(91,97,110,0.24)]">
                 <Brain className="w-4 h-4 text-amber-400" />
-                <span className="font-semibold text-sm text-slate-100">AI Signal Engine</span>
+                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">AI Signal Engine</span>
               </div>
               <div className="flex-1 overflow-hidden flex">
                 <div className="w-full max-w-xl overflow-y-auto">
                   <SignalPanel candles={candles} onPlaceOrder={handlePlaceOrder} />
                 </div>
-                <div className="flex-1 border-l border-slate-800 min-w-0">
+                <div className="flex-1 border-l border-[rgba(91,97,110,0.24)] min-w-0">
                   <TradingChart onCandlesReady={setCandles} />
                 </div>
               </div>
@@ -548,13 +555,13 @@ export default function App() {
 
           {/* ── ORDERS tab ── */}
           {activeTab === 'orders' && (
-            <div className="flex-1 flex flex-col overflow-hidden p-3">
-              <div className="mb-3 px-4 py-2 rounded-lg border border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/70">
+            <div className="flex-1 flex flex-col overflow-hidden p-3.5">
+              <div className="coinbase-surface-soft mb-3.5 px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shrink-0">
                 <ShoppingBag className="w-4 h-4 text-amber-400" />
-                <span className="font-semibold text-sm text-slate-100">Lệnh đang hoạt động</span>
+                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">Lệnh đang hoạt động</span>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/45">
+              <div className="coinbase-surface flex-1 min-h-0 overflow-hidden rounded-2xl">
                 <PendingOrdersPanel />
               </div>
             </div>
@@ -563,12 +570,12 @@ export default function App() {
           {/* ── ACCOUNT tab ── */}
           {activeTab === 'account' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="px-4 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/70">
+              <div className="coinbase-surface-soft px-4 py-2.5 flex items-center gap-2.5 shrink-0 border-b border-[rgba(91,97,110,0.24)]">
                 <Wallet className="w-4 h-4 text-amber-400" />
-                <span className="font-semibold text-sm text-slate-100">Tài khoản</span>
+                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">Tài khoản</span>
               </div>
               <div className="flex-1 overflow-y-auto max-w-3xl mx-auto w-full p-3">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+                <div className="coinbase-surface rounded-2xl overflow-hidden">
                   <AccountPanel />
                 </div>
               </div>
@@ -578,12 +585,12 @@ export default function App() {
           {/* ── NEWS tab ── */}
           {activeTab === 'news' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="px-4 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/70">
+              <div className="coinbase-surface-soft px-4 py-2.5 flex items-center gap-2.5 shrink-0 border-b border-[rgba(91,97,110,0.24)]">
                 <Newspaper className="w-4 h-4 text-amber-400" />
-                <span className="font-semibold text-sm text-slate-100">Tin tức & Sentiment</span>
+                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">Tin tức & Sentiment</span>
               </div>
               <div className="flex-1 overflow-hidden max-w-3xl mx-auto w-full p-3">
-                <div className="h-full rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+                <div className="coinbase-surface h-full rounded-2xl overflow-hidden">
                   <NewsFeed />
                 </div>
               </div>
@@ -593,7 +600,7 @@ export default function App() {
           {/* ── SETTINGS tab ── */}
           {activeTab === 'settings' && (
             <div className="flex-1 overflow-y-auto p-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+              <div className="coinbase-surface rounded-2xl overflow-hidden">
                 <SettingsPanel />
               </div>
             </div>

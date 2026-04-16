@@ -20,10 +20,10 @@ interface VisualOrder {
 }
 
 const sourceToneMap: Record<PositionSource, string> = {
-  AUTO_LIVE: 'border-indigo-500/50 bg-indigo-500/20 text-indigo-200',
-  AUTO_SIM: 'border-cyan-500/50 bg-cyan-500/20 text-cyan-200',
-  MANUAL_LIVE: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200',
-  MANUAL_SIM: 'border-amber-500/50 bg-amber-500/20 text-amber-200',
+  AUTO_LIVE: 'border-[rgba(0,82,255,0.45)] bg-[rgba(0,82,255,0.12)] text-[#93b7ff]',
+  AUTO_SIM: 'border-[rgba(87,139,250,0.45)] bg-[rgba(87,139,250,0.12)] text-[#b8d0ff]',
+  MANUAL_LIVE: 'border-[rgba(14,203,129,0.45)] bg-[rgba(14,203,129,0.12)] text-[#8cf2c6]',
+  MANUAL_SIM: 'border-[rgba(240,185,11,0.45)] bg-[rgba(240,185,11,0.12)] text-[#ffd770]',
 };
 
 const calcMarginEstimate = (entry: number, quantity: number, leverage: number, contractSize: number) => {
@@ -70,21 +70,21 @@ const formatTime = (rawTimestamp: number) => {
 };
 
 const getPnlClass = (value: number | null) => {
-  if (value === null || !Number.isFinite(value) || value === 0) return 'text-slate-400';
-  return value > 0 ? 'text-emerald-400' : 'text-rose-400';
+  if (value === null || !Number.isFinite(value) || value === 0) return 'text-[#9aa6c2]';
+  return value > 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]';
 };
 
 const sourceBadges = (source: PositionSource) => {
   const badges: Array<{ label: 'SIM' | 'LIVE' | 'AI'; tone: string }> = [];
 
   if (source === 'AUTO_LIVE' || source === 'AUTO_SIM') {
-    badges.push({ label: 'AI', tone: 'border-violet-500/50 bg-violet-500/20 text-violet-200' });
+    badges.push({ label: 'AI', tone: 'border-[rgba(168,85,247,0.45)] bg-[rgba(168,85,247,0.14)] text-[#ddb7ff]' });
   }
 
   if (source === 'AUTO_SIM' || source === 'MANUAL_SIM') {
-    badges.push({ label: 'SIM', tone: 'border-cyan-500/50 bg-cyan-500/20 text-cyan-200' });
+    badges.push({ label: 'SIM', tone: 'border-[rgba(87,139,250,0.45)] bg-[rgba(87,139,250,0.12)] text-[#b9d2ff]' });
   } else {
-    badges.push({ label: 'LIVE', tone: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200' });
+    badges.push({ label: 'LIVE', tone: 'border-[rgba(14,203,129,0.45)] bg-[rgba(14,203,129,0.12)] text-[#95f4ca]' });
   }
 
   return badges;
@@ -167,27 +167,27 @@ export default function PendingOrdersPanel() {
   };
 
   return (
-    <div className="h-full overflow-auto bg-slate-900 text-slate-200">
-      <div className="min-w-[1400px]">
-        <table className="w-full border-collapse text-sm">
-          <thead className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur">
-            <tr className="border-b border-slate-700/80 text-[11px] uppercase tracking-wide text-slate-400">
-              <th className="px-3 py-2 text-left font-semibold">Thời gian</th>
-              <th className="px-3 py-2 text-left font-semibold">Cặp giao dịch & Vị thế</th>
-              <th className="px-3 py-2 text-left font-semibold">Kích thước</th>
-              <th className="px-3 py-2 text-left font-semibold">Giá vào</th>
-              <th className="px-3 py-2 text-left font-semibold">Giá hiện tại</th>
-              <th className="px-3 py-2 text-left font-semibold">Ký quỹ</th>
-              <th className="px-3 py-2 text-left font-semibold">PnL chưa thực hiện</th>
-              <th className="px-3 py-2 text-left font-semibold">TP / SL</th>
-              <th className="px-3 py-2 text-right font-semibold">Thao tác</th>
+    <div className="h-full overflow-auto bg-transparent text-[var(--text-main)]">
+      <div className="min-w-[1460px]">
+        <table className="w-full border-separate border-spacing-0 text-[13px] leading-5">
+          <thead className="coinbase-data-head sticky top-0 z-20 backdrop-blur-xl">
+            <tr className="border-b border-[rgba(91,97,110,0.2)] text-[11px] uppercase tracking-[0.08em] text-[#96a2be]">
+              <th className="px-3.5 py-2.5 text-left font-semibold">Thời gian</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">Cặp giao dịch & Vị thế</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">Kích thước</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">Giá vào</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">Giá hiện tại</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">Ký quỹ</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">PnL chưa thực hiện</th>
+              <th className="px-3.5 py-2.5 text-left font-semibold">TP / SL</th>
+              <th className="px-3.5 py-2.5 text-right font-semibold">Thao tác</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-800/80">
+          <tbody className="divide-y divide-[rgba(91,97,110,0.18)]">
             {activeVisualOrders.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-sm text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-sm font-medium text-[#96a2be]">
                   Chưa có lệnh đang hoạt động.
                 </td>
               </tr>
@@ -208,53 +208,53 @@ export default function PendingOrdersPanel() {
                   <tr
                     key={order.key}
                     onClick={() => setSelectedSymbol(order.symbol)}
-                    className="cursor-pointer transition-colors hover:bg-slate-800/50"
+                    className="coinbase-data-row cursor-pointer border-b border-[rgba(91,97,110,0.16)]"
                     title="Nhấn để chuyển chart sang coin của lệnh"
                   >
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs text-slate-300">
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs font-medium text-[#c8d4ed]">
                       {formatTime(order.createdAt)}
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-100">{order.symbol.replace('_', '/')}</span>
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${order.side === 'LONG' ? 'bg-emerald-900/40 text-emerald-300' : 'bg-rose-900/40 text-rose-300'}`}>
+                    <td className="px-3.5 py-3 align-middle">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">{order.symbol.replace('_', '/')}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-[0.08em] ${order.side === 'LONG' ? 'border-[rgba(14,203,129,0.45)] bg-[rgba(14,203,129,0.12)] text-[#8ff4c6]' : 'border-[rgba(246,70,93,0.45)] bg-[rgba(246,70,93,0.12)] text-[#ffa6b5]'}`}>
                           {order.side}
                         </span>
                       </div>
 
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {sourceBadges(order.source).map((badge) => (
-                          <span key={`${order.key}-${badge.label}`} className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold ${badge.tone}`}>
+                          <span key={`${order.key}-${badge.label}`} className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-[0.08em] ${badge.tone}`}>
                             {badge.label}
                           </span>
                         ))}
-                        <span className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold ${sourceToneMap[order.source]}`}>
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-[0.08em] ${sourceToneMap[order.source]}`}>
                           {order.source.replace('_', ' ')}
                         </span>
                       </div>
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs">
-                      <div className="text-slate-100">Qty: {order.quantity.toFixed(3)}</div>
-                      <div className="text-slate-400">Lev: {order.leverage}x</div>
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs">
+                      <div className="font-medium text-[#f5f7ff]">Qty: {order.quantity.toFixed(3)}</div>
+                      <div className="text-[#9aa6c2]">Lev: {order.leverage}x</div>
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs text-slate-100">
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs font-medium text-[#dfe8ff]">
                       {order.entry.toFixed(4)}
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs">
-                      <span className={markPrice === null ? 'text-slate-500' : 'text-sky-300'}>
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs">
+                      <span className={markPrice === null ? 'text-[#8893ad]' : 'font-medium text-[#8db5ff]'}>
                         {markPrice === null ? '—' : markPrice.toFixed(4)}
                       </span>
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs text-amber-300">
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs font-medium text-[#ffd979]">
                       {margin.toFixed(2)} USDT
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs leading-5">
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs leading-5">
                       <div className={getPnlClass(unrealizedPnl)}>
                         {unrealizedPnl === null ? '—' : formatSignedMoney(unrealizedPnl)}
                       </div>
@@ -263,24 +263,24 @@ export default function PendingOrdersPanel() {
                       </div>
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle font-mono text-xs leading-5">
-                      <div className="text-emerald-300">TP: {typeof order.tp === 'number' ? order.tp.toFixed(4) : '—'}</div>
-                      <div className="text-rose-300">SL: {typeof order.sl === 'number' ? order.sl.toFixed(4) : '—'}</div>
+                    <td className="px-3.5 py-3 align-middle font-mono text-xs leading-5">
+                      <div className="text-[var(--color-success)]">TP: {typeof order.tp === 'number' ? order.tp.toFixed(4) : '—'}</div>
+                      <div className="text-[var(--color-danger)]">SL: {typeof order.sl === 'number' ? order.sl.toFixed(4) : '—'}</div>
                     </td>
 
-                    <td className="px-3 py-2.5 align-middle text-right">
+                    <td className="px-3.5 py-3 align-middle text-right">
                       {order.cancelable ? (
                         <button
                           id={`pending-order-cancel-${order.key}`}
                           onClick={(event) => handleCancelOrder(order.key, event)}
-                          className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(225,29,72,0.35)] transition-colors hover:bg-red-700"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(246,70,93,0.5)] bg-[rgba(246,70,93,0.14)] px-4 py-1.5 text-xs font-semibold text-[#ffd9de] shadow-[0_8px_18px_rgba(246,70,93,0.28)] transition-all hover:-translate-y-[1px] hover:bg-[rgba(246,70,93,0.24)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                           title="Hủy lệnh"
                         >
                           <X className="h-3.5 w-3.5" />
                           Hủy
                         </button>
                       ) : (
-                        <span className="text-xs text-slate-600">—</span>
+                        <span className="text-xs font-medium text-[#6f7b96]">—</span>
                       )}
                     </td>
                   </tr>
