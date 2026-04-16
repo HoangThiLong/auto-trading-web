@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+numpy
+torch
+git+https://github.com/google-research/timesfm.git
