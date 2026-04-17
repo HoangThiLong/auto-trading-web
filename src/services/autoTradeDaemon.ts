@@ -310,6 +310,7 @@ class AutoTradeDaemonService {
                   type: aiResult.direction,
                   confidence: aiResult.confidence,
                   aiProvider: aiResult.provider,
+                  aiAnalysis: aiResult.debateHistory || aiResult.analysis, // Store the full debate
                 };
                 const temp = tradeSignal.takeProfit;
                 tradeSignal.takeProfit = tradeSignal.stopLoss;
@@ -319,6 +320,7 @@ class AutoTradeDaemonService {
                   ...signal,
                   confidence: aiResult.confidence,
                   aiProvider: aiResult.provider,
+                  aiAnalysis: aiResult.debateHistory || aiResult.analysis,
                 };
                 if (
                   aiResult.keyLevels
@@ -474,6 +476,7 @@ class AutoTradeDaemonService {
           confidence: orderIntent.confidence,
           winRate: orderIntent.winRate,
           aiProvider: orderIntent.aiProvider,
+          aiAnalysis: tradeSignal.aiAnalysis,
           status: 'OPENED',
         };
 

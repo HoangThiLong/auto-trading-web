@@ -18,17 +18,25 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Proxy MEXC contract API calls to bypass CORS
-      '/api/v1/contract': {
+    '/api/v1/contract': {
         target: 'https://contract.mexc.com',
         changeOrigin: true,
         secure: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.error('[Vite Proxy] Contract API Error:', err.message);
+          });
+        },
       },
-      // Proxy MEXC private API calls (futures account/order)
       '/api/v1/private': {
         target: 'https://contract.mexc.com',
         changeOrigin: true,
         secure: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.error('[Vite Proxy] Private API Error:', err.message);
+          });
+        },
       },
     },
   },

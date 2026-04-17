@@ -156,6 +156,8 @@ export interface AiAnalysisResult {
   keyLevels: { support: number; resistance: number };
   riskWarning: string | null;
   provider: AiProviderId;
+  speedMs: number;
+  debateHistory?: string;
 }
 
 export async function analyzeWithAI(
@@ -168,9 +170,9 @@ export async function analyzeWithAI(
   timesFmForecast: number[] | null = null,
   marketContext: { volumeTrend: 'increasing' | 'decreasing' | 'neutral', volatility: 'high' | 'normal' | 'low' } | null = null
 ): Promise<AiAnalysisResult | null> {
+  const startTime = performance.now();
   const prompt = buildAdvancedPrompt(symbol, signal, candles, currentPrice, tradeLessons, timesFmForecast, marketContext);
 
-  // Build priority queue: preferred first, then the rest
   const order: AiProviderId[] = ['gemini', 'groq', 'openrouter', 'together'];
   if (credentials.preferredProvider) {
     const pref = credentials.preferredProvider;
@@ -178,18 +180,19 @@ export async function analyzeWithAI(
     order.splice(0, order.length, pref, ...rest);
   }
 
+  // Phase 1: Proposer
+  let proposerResult: AiAnalysisResult | null = null;
+  let proposerId: AiProviderId | null = null;
+  let proposerTime = 0;
+
   for (const providerId of order) {
     const key = credentials[providerId as keyof AiModelCredentials] as string | undefined;
-    if (!key) continue;
-    if (!canCallProvider(providerId)) {
-      console.log(`[AI] ${providerId} on cooldown, skipping`);
-      continue;
-    }
+    if (!key || !canCallProvider(providerId)) continue;
 
     try {
+      const pStart = performance.now();
       markProviderCalled(providerId);
       let raw = '';
-
       if (providerId === 'gemini') raw = await callGemini(key, prompt);
       else if (providerId === 'groq') raw = await callGroq(key, prompt);
       else if (providerId === 'openrouter') raw = await callOpenRouter(key, prompt);
@@ -197,20 +200,68 @@ export async function analyzeWithAI(
 
       const parsed = parseAiResponse(raw);
       if (parsed) {
-        console.log(`[AI] Success via ${providerId}`);
-        return { ...parsed, provider: providerId };
+        proposerResult = { ...parsed, provider: providerId, speedMs: 0 };
+        proposerId = providerId;
+        proposerTime = performance.now() - pStart;
+        break;
       }
     } catch (err: any) {
-      if (err.message === 'RATE_LIMIT') {
-        console.warn(`[AI] ${providerId} rate limited, backing off`);
-        markProviderRateLimited(providerId);
-      } else {
-        console.error(`[AI] ${providerId} error:`, err.message);
-      }
+      if (err.message === 'RATE_LIMIT') markProviderRateLimited(providerId);
     }
   }
 
-  return null;
+  if (!proposerResult || !proposerId) return null;
+
+  // Phase 2: Critic (if another key is available)
+  const remainingProviders = order.filter(id => id !== proposerId && !!credentials[id as keyof AiModelCredentials] && canCallProvider(id));
+  let debateLog = `[Proposer - ${proposerId} - ${(proposerTime/1000).toFixed(1)}s]: ${proposerResult.direction} (${proposerResult.confidence}%) - ${proposerResult.analysis}`;
+  
+  if (remainingProviders.length > 0) {
+    const criticId = remainingProviders[0];
+    const criticKey = credentials[criticId as keyof AiModelCredentials] as string;
+    const criticPrompt = `Bạn là chuyên gia giám sát (Critic). Hãy phản biện đề xuất giao dịch sau đây dựa trên bối cảnh thị trường.
+    Đề xuất: ${proposerResult.direction} tại ${currentPrice}, Phân tích: ${proposerResult.analysis}
+    
+    Hãy trả về JSON format như cũ. Nếu bạn đồng ý, giữ nguyên direction. Nếu bạn thấy rủi ro cao, hãy đổi thành NEUTRAL hoặc phản đối bằng direction ngược lại.
+    Thêm lý do phản biện vào phần analysis.`;
+
+    try {
+      const cStart = performance.now();
+      markProviderCalled(criticId);
+      let rawCritic = '';
+      if (criticId === 'gemini') rawCritic = await callGemini(criticKey, criticPrompt);
+      else if (criticId === 'groq') rawCritic = await callGroq(criticKey, criticPrompt);
+      else if (criticId === 'openrouter') rawCritic = await callOpenRouter(criticKey, criticPrompt);
+      
+      const parsedCritic = parseAiResponse(rawCritic);
+      const criticTime = performance.now() - cStart;
+      
+      if (parsedCritic) {
+        const isAgreement = parsedCritic.direction === proposerResult.direction;
+        debateLog += `\n[Critic - ${criticId} - ${(criticTime/1000).toFixed(1)}s]: ${isAgreement ? 'ĐỒNG Ý' : 'PHẢN ĐỐI ('+parsedCritic.direction+')'} - ${parsedCritic.analysis}`;
+        
+        // Final Decision: Use Critic's judgment as it's the final filter
+        proposerResult = {
+          ...parsedCritic,
+          provider: criticId,
+          speedMs: performance.now() - startTime,
+          debateHistory: debateLog
+        };
+      }
+    } catch (err) {
+      console.warn('[AI Debate] Critic failed, falling back to Proposer');
+    }
+  }
+
+  const finalTime = performance.now() - startTime;
+  const lessonCount = tradeLessons.length;
+  
+  // Inject memory log into analysis
+  proposerResult.analysis = `[Debate - ${(finalTime/1000).toFixed(1)}s][Memory: ${lessonCount} bài học]: ${proposerResult.analysis}`;
+  proposerResult.speedMs = finalTime;
+  proposerResult.debateHistory = debateLog;
+
+  return proposerResult;
 }
 
 export function getProviderStatus(credentials: AiModelCredentials | null): Record<AiProviderId, { hasKey: boolean; onCooldown: boolean }> {

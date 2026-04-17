@@ -7,16 +7,22 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   let attempt = 0;
   while (true) {
     try {
-      const res = await fetch(url, options);
+      const controller = new AbortController();
+      const signal = controller.signal;
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s absolute timeout
+
+      const res = await fetch(url, { ...options, signal });
+      clearTimeout(timeoutId);
       
       // Retry on 429 (Rate Limit) or 5xx (Server Error)
       if (!res.ok && (res.status === 429 || res.status >= 500)) {
         if (attempt >= maxRetries) {
-          throw new Error(`HTTP ${res.status}: Max retries reached`);
+          throw new Error(`HTTP ${res.status}: Max retries reached after ${attempt} attempts`);
         }
-        // Exponential backoff with jitter: (2^attempt * 500ms) + (0-200ms)
-        const delay = (Math.pow(2, attempt) * 500) + Math.random() * 200;
-        console.warn(`[MEXC HTTP] Error ${res.status} for ${url}. Retrying in ${Math.round(delay)}ms... (Attempt ${attempt + 1}/${maxRetries})`);
+        
+        // Jittered backoff: (2^attempt * 1000ms) + 0-500ms
+        const delay = (Math.pow(2, attempt) * 1000) + Math.random() * 500;
+        console.warn(`[MEXC HTTP] Status ${res.status} (attempt ${attempt + 1}). Retrying in ${Math.round(delay)}ms...`);
         await wait(delay);
         attempt++;
         continue;
@@ -28,31 +34,60 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
       if (attempt >= maxRetries) {
         throw err;
       }
-      const delay = (Math.pow(2, attempt) * 500) + Math.random() * 200;
-      console.warn(`[MEXC HTTP] Network error: ${err.message}. Retrying in ${Math.round(delay)}ms...`);
+      
+      const isNetworkError = err.name === 'AbortError' || err.message?.includes('network') || err.message?.includes('reset');
+      const delay = (Math.pow(2, attempt) * 1000) + Math.random() * 500;
+      
+      console.warn(`[MEXC HTTP] ${isNetworkError ? 'Network Error' : 'Error'}: ${err.message}. Retrying in ${Math.round(delay)}ms...`);
       await wait(delay);
       attempt++;
     }
   }
 }
 
-// Use relative URLs — Vite proxy will forward to contract.mexc.com
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
+
+const resolveMexcBaseUrl = (): string => {
+  const configuredBaseUrl = import.meta.env.VITE_TIMESFM_API_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    // In production, we route through our backend proxy
+    return `${normalizeBaseUrl(configuredBaseUrl)}/api/proxy/mexc_v1`;
+  }
+
+  // Locally, we use Vite's proxy (relative paths)
+  return '';
+};
+
+const MEXC_API_ROOT = resolveMexcBaseUrl();
+
 const api = {
   async get(url: string, options?: { params?: Record<string, any>; headers?: Record<string, string> }) {
+    // In production (with backend proxy), map /api/v1/* -> /*
+    // In local dev, keep original /api/v1/* so Vite proxy still works.
+    const endpoint = MEXC_API_ROOT
+      ? url.replace('/api/v1/', '/')
+      : url;
+    const finalUrl = `${MEXC_API_ROOT}${endpoint}`;
+
     const queryStr = options?.params
       ? '?' + new URLSearchParams(
           Object.entries(options.params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
         ).toString()
       : '';
       
-    const res = await fetchWithRetry(url + queryStr, {
+    const res = await fetchWithRetry(finalUrl + queryStr, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json', ...options?.headers },
     });
     return res.json();
   },
   async post(url: string, body: any, options?: { headers?: Record<string, string> }) {
-    const res = await fetchWithRetry(url, {
+    const endpoint = MEXC_API_ROOT
+      ? url.replace('/api/v1/', '/')
+      : url;
+    const finalUrl = `${MEXC_API_ROOT}${endpoint}`;
+
+    const res = await fetchWithRetry(finalUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...options?.headers },
       body: JSON.stringify(body),

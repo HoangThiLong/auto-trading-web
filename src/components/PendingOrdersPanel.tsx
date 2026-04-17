@@ -17,6 +17,7 @@ interface VisualOrder {
   source: PositionSource;
   createdAt: number;
   cancelable: boolean;
+  intentId?: string;
 }
 
 const sourceToneMap: Record<PositionSource, string> = {
@@ -96,6 +97,7 @@ export default function PendingOrdersPanel() {
   const contracts = useStore((state) => state.contracts);
   const tickers = useStore((state) => state.tickers);
   const removeOrder = useStore((state) => state.removeOrder);
+  const updateAutoTradeLog = useStore((state) => state.updateAutoTradeLog);
   const setSelectedSymbol = useStore((state) => state.setSelectedSymbol);
 
   const tickerMap = useMemo(() => {
@@ -136,7 +138,8 @@ export default function PendingOrdersPanel() {
           leverage: log.leverage,
           source: log.mode === 'live' ? 'AUTO_LIVE' : 'AUTO_SIM',
           createdAt: log.timestamp,
-          cancelable: false,
+          cancelable: true,
+          intentId: log.intentId,
         });
       });
 
@@ -155,20 +158,34 @@ export default function PendingOrdersPanel() {
           source: order.isSimulation ? 'MANUAL_SIM' : 'MANUAL_LIVE',
           createdAt: order.createdAt,
           cancelable: true,
+          intentId: order.intentId,
         });
       });
 
     return merged.sort((a, b) => b.createdAt - a.createdAt);
   }, [autoTradeLogs, pendingOrders]);
 
-  const handleCancelOrder = (orderId: string, event: MouseEvent<HTMLButtonElement>) => {
+  const handleCancelOrder = (order: VisualOrder, event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    removeOrder(orderId);
+
+    if (order.source === 'AUTO_LIVE' || order.source === 'AUTO_SIM') {
+      updateAutoTradeLog(order.key, { status: 'CLOSED' });
+
+      if (order.intentId) {
+        pendingOrders
+          .filter((pendingOrder) => pendingOrder.intentId === order.intentId && pendingOrder.status === 'PENDING')
+          .forEach((pendingOrder) => removeOrder(pendingOrder.id));
+      }
+
+      return;
+    }
+
+    removeOrder(order.key);
   };
 
   return (
-    <div className="h-full overflow-auto bg-transparent text-[var(--text-main)]">
-      <div className="min-w-[1460px]">
+    <div className="h-full overflow-x-auto overflow-y-auto bg-transparent text-[var(--text-main)]">
+      <div className="min-w-[1240px]">
         <table className="w-full border-separate border-spacing-0 text-[13px] leading-5">
           <thead className="coinbase-data-head sticky top-0 z-20 backdrop-blur-xl">
             <tr className="border-b border-[rgba(91,97,110,0.2)] text-[11px] uppercase tracking-[0.08em] text-[#96a2be]">
@@ -180,7 +197,7 @@ export default function PendingOrdersPanel() {
               <th className="px-3.5 py-2.5 text-left font-semibold">Ký quỹ</th>
               <th className="px-3.5 py-2.5 text-left font-semibold">PnL chưa thực hiện</th>
               <th className="px-3.5 py-2.5 text-left font-semibold">TP / SL</th>
-              <th className="px-3.5 py-2.5 text-right font-semibold">Thao tác</th>
+              <th className="sticky right-0 z-30 bg-[rgba(18,21,29,0.96)] px-3.5 py-2.5 text-right font-semibold">Thao tác</th>
             </tr>
           </thead>
 
@@ -268,20 +285,16 @@ export default function PendingOrdersPanel() {
                       <div className="text-[var(--color-danger)]">SL: {typeof order.sl === 'number' ? order.sl.toFixed(4) : '—'}</div>
                     </td>
 
-                    <td className="px-3.5 py-3 align-middle text-right">
-                      {order.cancelable ? (
-                        <button
-                          id={`pending-order-cancel-${order.key}`}
-                          onClick={(event) => handleCancelOrder(order.key, event)}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(246,70,93,0.5)] bg-[rgba(246,70,93,0.14)] px-4 py-1.5 text-xs font-semibold text-[#ffd9de] shadow-[0_8px_18px_rgba(246,70,93,0.28)] transition-all hover:-translate-y-[1px] hover:bg-[rgba(246,70,93,0.24)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Hủy lệnh"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Hủy
-                        </button>
-                      ) : (
-                        <span className="text-xs font-medium text-[#6f7b96]">—</span>
-                      )}
+                    <td className="sticky right-0 z-10 bg-[rgba(13,18,28,0.94)] px-3.5 py-3 align-middle text-right shadow-[-10px_0_18px_rgba(3,7,18,0.45)]">
+                      <button
+                        id={`pending-order-cancel-${order.key}`}
+                        onClick={(event) => handleCancelOrder(order, event)}
+                        className="inline-flex min-w-[92px] items-center justify-center gap-1.5 rounded-xl bg-[var(--color-danger)] px-4 py-2 text-sm font-extrabold text-white shadow-[0_10px_22px_rgba(246,70,93,0.38)] transition-all hover:-translate-y-[1px] hover:bg-rose-600 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-rose-300/80"
+                        title="Hủy lệnh"
+                      >
+                        <X className="h-4 w-4" />
+                        Hủy
+                      </button>
                     </td>
                   </tr>
                 );

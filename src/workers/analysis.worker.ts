@@ -306,7 +306,13 @@ worker.onmessage = (event: MessageEvent<AnalysisWorkerRequest>) => {
 
   try {
     if (req.type === 'GENERATE_SIGNAL') {
+      const start = performance.now();
       const signal = generateSignal(req.payload.candles);
+      const end = performance.now();
+      
+      // Inject speed into signal reasons for UI transparency
+      signal.reasons.unshift(`⚡ Tech Analysis Speed: ${(end - start).toFixed(2)}ms`);
+
       const res: AnalysisWorkerResponse = {
         id: reqId,
         type: 'GENERATE_SIGNAL_RESULT',

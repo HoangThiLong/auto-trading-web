@@ -1,17 +1,33 @@
+import os
+from typing import List
+
+import numpy as np
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
-import numpy as np
 
-app = FastAPI()
+from routers.proxy_router import proxy_router
+
+load_dotenv()
+
+
+def resolve_allowed_origins() -> List[str]:
+    raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173"]
+
+
+app = FastAPI(title="TimesFM + Proxy Backend", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=resolve_allowed_origins(),
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+app.include_router(proxy_router)
 
 model = None
 model_mode = None  # "v2_5" | "legacy"
@@ -68,6 +84,16 @@ def load_model():
 class ForecastRequest(BaseModel):
     history: List[float]
     horizon: int = 12
+
+
+@app.get("/health")
+def health():
+    return {
+        "ok": True,
+        "model_loaded": bool(model),
+        "model_mode": model_mode,
+        "allowed_origins": resolve_allowed_origins(),
+    }
 
 
 @app.post("/api/forecast")

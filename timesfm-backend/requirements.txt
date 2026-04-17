@@ -2,4 +2,6 @@ fastapi
 uvicorn
 numpy
 torch
+python-dotenv
+httpx
 git+https://github.com/google-research/timesfm.git

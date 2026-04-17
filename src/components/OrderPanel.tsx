@@ -14,7 +14,7 @@ export default function OrderPanel({ prefillSignal }: Props) {
 
   const ticker = tickers.find(t => t.symbol === selectedSymbol);
   const currentPrice = ticker?.lastPrice || 0;
-  
+
   const contractInfo = contracts?.find(c => c.symbol === selectedSymbol);
   const contractSize = contractInfo?.contractSize || 1;
 
@@ -134,41 +134,69 @@ export default function OrderPanel({ prefillSignal }: Props) {
   const activePending = pendingOrders.filter(o => o.status === 'PENDING');
 
   return (
-    <div className="flex flex-col gap-4 text-white h-full overflow-y-auto p-5">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-5 text-[var(--text-main)]">
       {/* Order Form */}
-      <div className="bg-[#161b25] rounded-2xl border border-[#2a3045] p-5">
-        <div className="flex items-center gap-3 mb-5">
-          <ShoppingBag className="w-5 h-5 text-[#f0b90b]" />
-          <span className="font-bold text-base">Đặt lệnh Futures</span>
-          <span className="text-sm text-gray-500 ml-auto">{selectedSymbol}</span>
+      <div className="coinbase-surface rounded-2xl p-5">
+        <div className="mb-5 flex items-center gap-3">
+          <ShoppingBag className="h-5 w-5 text-[var(--color-warning)]" />
+          <span className="text-base font-bold">Đặt lệnh Futures</span>
+          <span className="ml-auto text-sm text-[var(--text-muted)]">{selectedSymbol}</span>
         </div>
 
         {/* LONG/SHORT */}
-        <div className="flex gap-2 mb-5">
-          <button onClick={() => setSide('LONG')}
-            className={`flex-1 py-3 rounded-xl font-bold text-base transition-all ${side === 'LONG' ? 'bg-[#0ecb81] text-black' : 'bg-[#0b0e14] text-gray-500 hover:text-[#0ecb81]'}`}>
+        <div className="mb-5 grid grid-cols-2 gap-2.5">
+          <button
+            id="order-panel-long-button"
+            onClick={() => setSide('LONG')}
+            className={`rounded-xl py-3 text-base font-extrabold transition-all ${
+              side === 'LONG'
+                ? 'bg-[var(--color-success)] text-[#04140f] shadow-[0_12px_26px_rgba(14,203,129,0.34)] hover:brightness-105 active:scale-[0.99]'
+                : 'border border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)] hover:border-[rgba(14,203,129,0.45)] hover:text-[var(--color-success)]'
+            }`}
+          >
             LONG / MUA
           </button>
-          <button onClick={() => setSide('SHORT')}
-            className={`flex-1 py-3 rounded-xl font-bold text-base transition-all ${side === 'SHORT' ? 'bg-[#f6465d] text-white' : 'bg-[#0b0e14] text-gray-500 hover:text-[#f6465d]'}`}>
+          <button
+            id="order-panel-short-button"
+            onClick={() => setSide('SHORT')}
+            className={`rounded-xl py-3 text-base font-extrabold transition-all ${
+              side === 'SHORT'
+                ? 'bg-[var(--color-danger)] text-white shadow-[0_12px_26px_rgba(246,70,93,0.34)] hover:brightness-110 active:scale-[0.99]'
+                : 'border border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)] hover:border-[rgba(246,70,93,0.45)] hover:text-[var(--color-danger)]'
+            }`}
+          >
             SHORT / BÁN
           </button>
         </div>
 
         {/* Order type & Margin */}
-        <div className="flex gap-3 mb-5">
-          <div className="flex-1 flex gap-2">
+        <div className="mb-5 flex gap-3">
+          <div className="flex flex-1 gap-2">
             {(['LIMIT', 'MARKET'] as const).map(t => (
-              <button key={t} onClick={() => setOrderType(t)}
-                className={`flex-1 py-2 text-sm rounded-lg ${orderType === t ? 'bg-[#f0b90b] text-black font-bold' : 'bg-[#0b0e14] text-gray-500 hover:bg-[#1e2535]'}`}>
+              <button
+                key={t}
+                onClick={() => setOrderType(t)}
+                className={`flex-1 rounded-lg py-2 text-sm transition-all ${
+                  orderType === t
+                    ? 'bg-[var(--color-brand)] font-bold text-white shadow-[0_8px_18px_rgba(0,82,255,0.35)]'
+                    : 'border border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)] hover:border-[rgba(87,139,250,0.5)] hover:text-[#cfe0ff]'
+                }`}
+              >
                 {t}
               </button>
             ))}
           </div>
           <div className="flex gap-2">
             {(['ISOLATED', 'CROSS'] as const).map(t => (
-              <button key={t} onClick={() => setMarginType(t)}
-                className={`px-3 py-2 text-sm rounded-lg ${marginType === t ? 'bg-purple-700 text-white font-bold' : 'bg-[#0b0e14] text-gray-500 hover:bg-[#1e2535]'}`}>
+              <button
+                key={t}
+                onClick={() => setMarginType(t)}
+                className={`rounded-lg px-3 py-2 text-sm transition-all ${
+                  marginType === t
+                    ? 'bg-[var(--color-warning)] font-bold text-[#1f1300] shadow-[0_8px_18px_rgba(240,185,11,0.26)]'
+                    : 'border border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)] hover:border-[rgba(240,185,11,0.45)] hover:text-[#ffd47d]'
+                }`}
+              >
                 {t}
               </button>
             ))}
@@ -178,101 +206,138 @@ export default function OrderPanel({ prefillSignal }: Props) {
         {/* Price */}
         {orderType === 'LIMIT' && (
           <div className="mb-4">
-            <label className="text-xs text-gray-500 mb-2 block">GIÁ (USDT)</label>
+            <label className="mb-2 block text-xs text-[var(--text-muted)]">GIÁ (USDT)</label>
             <div className="flex gap-2">
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)}
-                className="flex-1 bg-[#0b0e14] border border-[#2a3045] rounded-xl px-4 py-3 text-base text-white font-mono focus:outline-none focus:border-[#f0b90b]" />
-              <button onClick={() => setPrice(currentPrice.toString())}
-                className="text-xs px-3 bg-[#1e2535] rounded-xl text-gray-400 hover:text-white font-medium">Thị trường</button>
+              <input
+                type="number"
+                value={price}
+                onChange={e => setPrice(e.target.value)}
+                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] px-4 py-3 font-mono text-base text-white transition-all focus:border-[var(--color-brand)] focus:outline-none focus:ring-2 focus:ring-[rgba(0,82,255,0.4)]"
+              />
+              <button
+                onClick={() => setPrice(currentPrice.toString())}
+                className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-muted)] transition-all hover:border-[rgba(87,139,250,0.5)] hover:text-white"
+              >
+                Thị trường
+              </button>
             </div>
           </div>
         )}
 
         {/* Quantity & Margin Input */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="mb-4 grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 mb-2 block uppercase">SỐ LƯỢNG (Hợp đồng)</label>
-            <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)}
-              className="w-full bg-[#0b0e14] border border-[#2a3045] rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-[#f0b90b]" />
-            <div className="text-[10px] text-gray-600 mt-1">1 hợp đồng = {contractSize} đồng</div>
+            <label className="mb-2 block text-xs uppercase text-[var(--text-muted)]">SỐ LƯỢNG (Hợp đồng)</label>
+            <input
+              type="number"
+              value={quantity}
+              onChange={e => setQuantity(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-main)] px-4 py-3 font-mono text-sm text-white transition-all focus:border-[var(--color-brand)] focus:outline-none focus:ring-2 focus:ring-[rgba(0,82,255,0.4)]"
+            />
+            <div className="mt-1 text-[10px] text-[var(--text-muted)]">1 hợp đồng = {contractSize} đồng</div>
           </div>
           <div>
-            <label className="text-xs text-purple-500 mb-2 block uppercase font-bold text-shadow">KÍ QUỸ ƯỚC TÍNH (USDT)</label>
-            <input type="number" value={marginRequired().toFixed(2)} onChange={e => handleMarginChange(e.target.value)}
-              className="w-full bg-[#0b0e14] border border-purple-900/50 rounded-xl px-4 py-3 text-sm text-purple-400 font-mono focus:outline-none focus:border-purple-500" />
-            <div className="text-[10px] text-gray-600 mt-1">Nhập Kí quỹ tự nhảy Số lượng</div>
+            <label className="mb-2 block text-xs font-bold uppercase text-[#c8b5ff]">KÍ QUỸ ƯỚC TÍNH (USDT)</label>
+            <input
+              type="number"
+              value={marginRequired().toFixed(2)}
+              onChange={e => handleMarginChange(e.target.value)}
+              className="w-full rounded-xl border border-[rgba(168,85,247,0.4)] bg-[var(--bg-main)] px-4 py-3 font-mono text-sm text-[#d6bcff] transition-all focus:border-[#b68aff] focus:outline-none focus:ring-2 focus:ring-[rgba(168,85,247,0.35)]"
+            />
+            <div className="mt-1 text-[10px] text-[var(--text-muted)]">Nhập Kí quỹ tự nhảy Số lượng</div>
           </div>
         </div>
 
         {/* Leverage */}
         <div className="mb-4">
-          <div className="flex justify-between mb-2">
-            <label className="text-xs text-gray-500">ĐÒN BẨY</label>
-            <span className="text-sm font-bold text-[#f0b90b]">{leverage}x</span>
+          <div className="mb-2 flex justify-between">
+            <label className="text-xs text-[var(--text-muted)]">ĐÒN BẨY</label>
+            <span className="text-sm font-bold text-[var(--color-warning)]">{leverage}x</span>
           </div>
-          <input type="range" min="1" max="125" value={leverage}
+          <input
+            type="range"
+            min="1"
+            max="125"
+            value={leverage}
             onChange={e => setLeverage(e.target.value)}
-            className="w-full accent-[#f0b90b] my-2" />
-          <div className="flex justify-between text-xs text-gray-600 font-medium">
+            className="my-2 w-full accent-[var(--color-warning)]"
+          />
+          <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]">
             {['1x', '10x', '25x', '50x', '100x', '125x'].map(l => (
-              <button key={l} onClick={() => setLeverage(l.replace('x', ''))} className="hover:text-yellow-400">{l}</button>
+              <button key={l} onClick={() => setLeverage(l.replace('x', ''))} className="transition-colors hover:text-[var(--color-warning)]">
+                {l}
+              </button>
             ))}
           </div>
         </div>
 
         {/* TP/SL */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="mb-5 grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-green-600 mb-2 block font-medium">TAKE PROFIT</label>
-            <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)}
+            <label className="mb-2 block text-xs font-medium text-[var(--color-success)]">TAKE PROFIT</label>
+            <input
+              type="number"
+              value={takeProfit}
+              onChange={e => setTakeProfit(e.target.value)}
               placeholder="Không bắt buộc"
-              className="w-full bg-[#0b0e14] border border-green-900 rounded-xl px-4 py-3 text-sm text-green-400 font-mono focus:outline-none focus:border-green-500" />
+              className="w-full rounded-xl border border-[rgba(14,203,129,0.35)] bg-[var(--bg-main)] px-4 py-3 font-mono text-sm text-[#95f4ca] transition-all focus:border-[var(--color-success)] focus:outline-none focus:ring-2 focus:ring-[rgba(14,203,129,0.3)]"
+            />
           </div>
           <div>
-            <label className="text-xs text-red-600 mb-2 block font-medium">STOP LOSS</label>
-            <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)}
+            <label className="mb-2 block text-xs font-medium text-[var(--color-danger)]">STOP LOSS</label>
+            <input
+              type="number"
+              value={stopLoss}
+              onChange={e => setStopLoss(e.target.value)}
               placeholder="Không bắt buộc"
-              className="w-full bg-[#0b0e14] border border-red-900 rounded-xl px-4 py-3 text-sm text-red-400 font-mono focus:outline-none focus:border-red-500" />
+              className="w-full rounded-xl border border-[rgba(246,70,93,0.35)] bg-[var(--bg-main)] px-4 py-3 font-mono text-sm text-[#ffb2bf] transition-all focus:border-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[rgba(246,70,93,0.35)]"
+            />
           </div>
         </div>
 
-
-
         {/* Submit */}
-        <button onClick={handleSubmit} disabled={submitting}
-          className={`w-full py-4 rounded-xl font-bold text-base transition-all ${
-            side === 'LONG' ? 'bg-[#0ecb81] text-black hover:bg-[#0ab870]' : 'bg-[#f6465d] text-white hover:bg-[#e03850]'
-          } disabled:opacity-50`}>
+        <button
+          id="order-panel-submit-button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className={`w-full rounded-xl py-4 text-base font-extrabold transition-all ${
+            side === 'LONG'
+              ? 'bg-[var(--color-success)] text-[#03150f] shadow-[0_12px_26px_rgba(14,203,129,0.32)] hover:brightness-105'
+              : 'bg-[var(--color-danger)] text-white shadow-[0_12px_26px_rgba(246,70,93,0.32)] hover:brightness-110'
+          } disabled:cursor-not-allowed disabled:opacity-50`}
+        >
           {submitting ? 'Đang đặt lệnh...' : `${side === 'LONG' ? '🚀 MỞ LONG' : '📉 MỞ SHORT'} ${leverage}x`}
         </button>
 
         {/* Open on MEXC */}
-        <a href={`https://futures.mexc.com/exchange/${selectedSymbol.replace('_', '')}`}
-          target="_blank" rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 mt-4 text-sm text-gray-500 hover:text-[#f0b90b] transition-colors">
-          <ExternalLink className="w-4 h-4" />
+        <a
+          href={`https://futures.mexc.com/exchange/${selectedSymbol.replace('_', '')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex items-center justify-center gap-2 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--color-warning)]"
+        >
+          <ExternalLink className="h-4 w-4" />
           Mở trên MEXC.com
         </a>
       </div>
 
       {/* Active Orders */}
       {activePending.length > 0 && (
-        <div className="bg-[#161b25] rounded-2xl border border-[#2a3045] p-5">
-          <div className="text-sm font-bold text-gray-400 mb-3">LỆNH ĐANG CHỜ ({activePending.length})</div>
+        <div className="coinbase-surface-soft rounded-2xl p-5">
+          <div className="mb-3 text-sm font-bold text-[var(--text-muted)]">LỆNH ĐANG CHỜ ({activePending.length})</div>
           <div className="space-y-2">
             {activePending.map(order => (
-              <div key={order.id} className="flex items-center gap-3 bg-[#0b0e14] rounded-xl p-3 text-sm">
-                <span className={`font-bold ${order.side === 'LONG' ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>{order.side}</span>
-                <span className="text-gray-300 font-medium">{order.symbol.replace('_USDT', '')}</span>
-                <span className="text-gray-500">{order.leverage}x</span>
-                <span className="text-white font-mono font-bold">{order.price.toFixed(2)}</span>
-                <span className="text-gray-600">×{order.quantity}</span>
+              <div key={order.id} className="flex items-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] p-3 text-sm">
+                <span className={`font-bold ${order.side === 'LONG' ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{order.side}</span>
+                <span className="font-medium text-[#d5def2]">{order.symbol.replace('_USDT', '')}</span>
+                <span className="text-[var(--text-muted)]">{order.leverage}x</span>
+                <span className="font-mono font-bold text-white">{order.price.toFixed(2)}</span>
+                <span className="text-[var(--text-muted)]">×{order.quantity}</span>
                 {order.signal && (
-                  <span className="text-xs bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded-full">AI</span>
+                  <span className="rounded-full border border-[rgba(168,85,247,0.45)] bg-[rgba(168,85,247,0.14)] px-2 py-0.5 text-xs text-[#d8bcff]">AI</span>
                 )}
-                <button onClick={() => cancelOrder(order.id)}
-                  className="ml-auto text-red-600 hover:text-red-400 p-1">
-                  <X className="w-4 h-4" />
+                <button onClick={() => cancelOrder(order.id)} className="ml-auto p-1 text-[var(--color-danger)] transition-colors hover:text-[#ff8a9c]">
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             ))}
@@ -282,8 +347,8 @@ export default function OrderPanel({ prefillSignal }: Props) {
 
       {/* API Key warning */}
       {!credentials && (
-        <div className="flex items-start gap-3 p-4 bg-yellow-950 border border-yellow-900 rounded-xl text-xs text-yellow-600">
-          <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-xl border border-[rgba(240,185,11,0.35)] bg-[rgba(240,185,11,0.12)] p-4 text-xs text-[#ffd77a]">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="leading-relaxed">Cấu hình API Key tại tab <strong>⚙️ Settings</strong> để đặt lệnh thực trên MEXC server</span>
         </div>
       )}

@@ -190,6 +190,7 @@ export interface AutoTradeLog {
   confidence: number;
   winRate: number;
   aiProvider: string;
+  aiAnalysis?: string; // Persisted AI debate result
   status: 'OPENED' | 'TP_HIT' | 'SL_HIT' | 'CLOSED' | 'SKIPPED';
   skipReason?: string;
   pnl?: number;
