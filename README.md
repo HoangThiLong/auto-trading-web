@@ -1,50 +1,66 @@
-# ⚡ MEXC Pro Futures Terminal v2
+# MEXC Pro Futures Trading Terminal v2
 
-> **Giao diện tối thượng. AI tối tân. Giao dịch tự động 24/7.**
-
-Trải nghiệm sự kết hợp hoàn hảo giữa công nghệ dự báo **TimesFM** của Google, trí tuệ nhân tạo **Gemini AI**, và hệ thống giao dịch tự động **Autopilot** mạnh mẽ. Một Terminal được thiết kế dành riêng cho những trader đòi hỏi sự chính xác và hiệu suất tuyệt đối.
+An advanced, automated trading platform for MEXC Futures, integrating Google's TimesFM time-series foundation model and Gemini AI for signal processing and automated execution.
 
 ---
 
-### 🔥 Điểm Nhấn Đẳng Cấp
+## Overview
 
-*   **🤖 AI Autopilot 24/7**: Hệ thống tự vận hành toàn diện. Từ phân tích tín hiệu, quản lý vốn đến thực thi lệnh — mọi thứ diễn ra tự động ngay cả khi bạn đang ngủ.
-*   **🔮 TimesFM Prediction**: Tích hợp mô hình dự báo chuỗi thời gian (Time-series Foundation Model) mới nhất từ Google Research, mang lại cái nhìn về tương lai của đường giá.
-*   **🧠 Gemini Intelligence**: Tín hiệu giao dịch được tinh chỉnh bởi Gemini AI, giúp loại bỏ nhiễu và tăng tỷ lệ thắng (Win-rate) thông qua phân tích đa tầng.
-*   **💎 High-End UI**: Giao diện Split-screen chuyên nghiệp, mượt mà trên từng pixel với hệ thống Design System từ Coinbase.
-*   **🛡️ Bảo Mật & An Toàn**: Cơ chế Kill Switch, Daily Loss Limit và News Filter tích hợp sẵn để bảo vệ tài sản của bạn trong mọi điều kiện thị trường.
+MEXC Pro Futures Terminal v2 is a high-performance trading interface and automated execution engine designed for professional traders. The system focuses on real-time data processing, predictive analytics, and robust risk management.
 
----
+## Technical Highlights
 
-### 🛠️ Trái Tim Công Nghệ
+*   **Predictive Analytics**: Integration with **TimesFM** (Google Research), providing advanced time-series forecasting to anticipate market trends.
+*   **AI-Driven Signal Processing**: Utilizing **Gemini AI** and high-speed LLMs (via Groq) to analyze market indicators, filtering noise and validating entry/exit signals.
+*   **Autonomous Execution Engine**: A multi-threaded trading engine that handles position management, dynamic SL/TP updates, and order execution 24/7.
+*   **Professional UI/UX**: A split-screen terminal built with a robust design system, prioritizing data density and financial-grade reliability.
+*   **Risk Management Protocol**: Integrated safety features including 'Kill Switch', daily loss limits, and news-based filters to protect capital.
 
-| Thành phần | Công nghệ chính |
-| :--- | :--- |
-| **Frontend** | React 19, Vite, TailwindCSS 4, Zustand 5 |
-| **Backend AI** | Gemini Pro, Groq, TimesFM (FastAPI + PyTorch) |
-| **Data Engine** | MEXC Real-time WebSocket, REST API |
-| **Analysis** | Web Workers (Async Signal Processing) |
+## Technology Stack
 
----
+### Frontend
+- **Framework**: React 19 (TypeScript)
+- **Build Tool**: Vite
+- **State Management**: Zustand 5 (Global persistent store)
+- **Styling**: Modern CSS with semantic tokenization (Coinbase-inspired)
+- **Data Fetching**: Custom WebSocket handlers & MEXC REST API v3
 
-### 🚀 Khởi Động Nhanh
+### Backend & AI
+- **TimesFM Intelligence**: FastAPI / PyTorch backend for time-series foundation model inference.
+- **LLM Integration**: Gemini API & Groq for low-latency market analysis.
+- **Processing**: Off-main-thread Web Workers for high-frequency signal calculation.
 
-1.  **Cài đặt Dependencies:**
+## Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- NPM or Yarn
+- (Optional) Python 3.10+ for TimesFM backend
+
+### Installation
+
+1.  **Clone and Install Dependencies:**
     ```bash
+    git clone https://github.com/HoangThiLong/auto-trading-web.git
+    cd auto-trading-web
     npm install
     ```
-2.  **Khởi chạy Terminal:**
+
+2.  **Environment Setup:**
+    Create a `.env` file in the root directory (refer to documentation for required API keys).
+
+3.  **Run Development Server:**
     ```bash
     npm run dev
     ```
-3.  **Hệ thống dự báo (Tùy chọn):** Khởi chạy backend TimesFM tại `/timesfm-backend`.
+
+4.  **TimesFM Backend (Optional):**
+    Navigate to `/timesfm-backend` and follow the instructions in the directory to start the inference server.
+
+## Disclaimer
+
+This software is for technical demonstration and educational purposes. Trading cryptocurrency futures involves significant risk. The developers are not responsible for financial losses incurred through the use of this terminal. Always test extensively in simulation mode before deploying capital.
 
 ---
 
-### ⚠️ Miễn Trừ Trách Nhiệm
-
-Đây là công cụ hỗ trợ giao dịch kỹ thuật cao. Thị trường Futures luôn tiềm ẩn rủi ro. Hãy luôn kiểm tra kỹ cấu hình trước khi kích hoạt chế độ **LIVE**.
-
----
-
-**MEXC Pro Futures Terminal v2** — *Biến dữ liệu thành lợi nhuận.*
+*Developed by HoangLong — Optimized for Precision and Performance.*
