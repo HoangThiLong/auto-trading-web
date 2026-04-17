@@ -22,7 +22,7 @@ app = FastAPI(title="TimesFM + Proxy Backend", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=resolve_allowed_origins(),
+    allow_origins=["*"],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )

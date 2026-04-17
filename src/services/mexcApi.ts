@@ -45,29 +45,53 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   }
 }
 
-const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
+const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
+const stripLeadingSlashes = (value: string) => value.replace(/^\/+/, '');
 
-const resolveMexcBaseUrl = (): string => {
+const joinUrl = (base: string, path: string): string => {
+  const safeBase = stripTrailingSlashes(base);
+  const safePath = stripLeadingSlashes(path);
+  return `${safeBase}/${safePath}`;
+};
+
+const resolveMexcApiRoot = (): string => {
   const configuredBaseUrl = import.meta.env.VITE_TIMESFM_API_BASE_URL?.trim();
-  if (configuredBaseUrl) {
-    // In production, we route through our backend proxy
-    return `${normalizeBaseUrl(configuredBaseUrl)}/api/proxy/mexc_v1`;
+
+  // Production must go through backend proxy.
+  if (import.meta.env.PROD) {
+    if (!configuredBaseUrl) {
+      console.error('[MEXC API] Missing VITE_TIMESFM_API_BASE_URL in production environment.');
+      return '/__missing_backend_base_url__/api/proxy/mexc_v1';
+    }
+    return joinUrl(configuredBaseUrl, '/api/proxy/mexc_v1');
   }
 
-  // Locally, we use Vite's proxy (relative paths)
+  // Local dev can use Vite proxy. If env is set locally, still allow proxy routing via backend.
+  if (configuredBaseUrl) {
+    return joinUrl(configuredBaseUrl, '/api/proxy/mexc_v1');
+  }
+
   return '';
 };
 
-const MEXC_API_ROOT = resolveMexcBaseUrl();
+const MEXC_API_ROOT = resolveMexcApiRoot();
+
+const mapEndpointForTarget = (url: string): string => {
+  if (!MEXC_API_ROOT) {
+    return url;
+  }
+  // Backend proxy expects: /api/proxy/mexc_v1/<endpoint-after-/api/v1/>
+  return url.replace(/^\/api\/v1\//, '/');
+};
+
+const buildRequestUrl = (url: string): string => {
+  const endpoint = mapEndpointForTarget(url);
+  return MEXC_API_ROOT ? joinUrl(MEXC_API_ROOT, endpoint) : endpoint;
+};
 
 const api = {
   async get(url: string, options?: { params?: Record<string, any>; headers?: Record<string, string> }) {
-    // In production (with backend proxy), map /api/v1/* -> /*
-    // In local dev, keep original /api/v1/* so Vite proxy still works.
-    const endpoint = MEXC_API_ROOT
-      ? url.replace('/api/v1/', '/')
-      : url;
-    const finalUrl = `${MEXC_API_ROOT}${endpoint}`;
+    const finalUrl = buildRequestUrl(url);
 
     const queryStr = options?.params
       ? '?' + new URLSearchParams(
@@ -82,10 +106,7 @@ const api = {
     return res.json();
   },
   async post(url: string, body: any, options?: { headers?: Record<string, string> }) {
-    const endpoint = MEXC_API_ROOT
-      ? url.replace('/api/v1/', '/')
-      : url;
-    const finalUrl = `${MEXC_API_ROOT}${endpoint}`;
+    const finalUrl = buildRequestUrl(url);
 
     const res = await fetchWithRetry(finalUrl, {
       method: 'POST',
