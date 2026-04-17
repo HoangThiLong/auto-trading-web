@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import CryptoJS from 'crypto-js';
 import type { ContractTicker, KlineData, OrderBook, FundingRate, ContractInfo, TimeInterval, RecentTrade } from '../types';
 

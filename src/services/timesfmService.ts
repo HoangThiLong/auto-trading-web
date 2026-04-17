@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
 
 const resolveTimesFmBaseUrl = (): string => {
