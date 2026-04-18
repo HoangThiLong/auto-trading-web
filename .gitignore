@@ -58,3 +58,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+dist-electron
+test-mexc-live.ts
+test_ws.cjs
+bot.ts
+ecosystem.config.js
