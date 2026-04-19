@@ -17,6 +17,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "test:production": "npx tsx test-production-ready.ts",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder"
   },
