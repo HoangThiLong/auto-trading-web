@@ -183,15 +183,20 @@ cd auto-trading-web
 ### Bước 4.5: Cài Đặt & Chạy Bot
 
 ```bash
-# Cài thư viện
-npm install
+# Cài thư viện runtime (KHÔNG cài Electron/Desktop)
+npm install --omit=dev
+
+# Cài gói biên dịch tối thiểu cho bot (không kéo theo Electron)
+npm install --no-save --omit=dev typescript @types/node @types/express @types/crypto-js
 
 # Build bot (biên dịch code)
-npm run build:bot
+npx tsc -p tsconfig.bot.json
 
 # Chạy bot
 node dist-bot/bot.js
 ```
+
+> **Lưu ý:** Trên Termux KHÔNG dùng `npm install` thường vì nó sẽ cố cài Electron (không hỗ trợ Android).
 
 **Để chạy ổn định 24/7, cài đặt PM2:**
 
@@ -268,14 +273,14 @@ npm run build:bot        # Build bot ngầm
 node dist-bot/bot.js     # Chạy bot ngầm
 
 # === TRÊN TERMUX (ĐIỆN THOẠI) ===
-cd auto-trading-web     # Vào thư mục
-npm run build:bot       # Build bot
-node dist-bot/bot.js     # Chạy bot thường
-
-# Hoặc dùng PM2 để chạy ổn định:
+cd auto-trading-web
+npm install --omit=dev
+npm install --no-save --omit=dev typescript @types/node @types/express @types/crypto-js
+npx tsc -p tsconfig.bot.json
+node dist-bot/bot.js
 pm2 start dist-bot/bot.js --name "mexc-bot"
 pm2 status              # Xem trạng thái
-pm2 logs mexc-bot      # Xem log
+pm2 logs mexc-bot        # Xem log
 
 # === KIỂM TRA ===
 curl http://localhost:3000/api/status   # Xem trạng thái
