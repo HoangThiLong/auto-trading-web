@@ -13,8 +13,8 @@ import { existsSync, unlinkSync } from 'node:fs';
 // ===========================================================================
 
 // --- [CONFIG] ---------------------------------------------------------------
-const API_KEY    = process.env.MEXC_API_KEY    || 'mx0vglgDltVcEMoZyH';
-const SECRET_KEY = process.env.MEXC_SECRET_KEY || 'b0bbce9ccf8a4ce2ac120c418dbc2565';
+const API_KEY    = process.env.MEXC_API_KEY    || '';
+const SECRET_KEY = process.env.MEXC_SECRET_KEY || '';
 const TEST_SYMBOL = 'BTC_USDT';
 // ---------------------------------------------------------------------------
 
