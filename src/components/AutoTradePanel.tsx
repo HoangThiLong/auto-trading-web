@@ -63,11 +63,11 @@ export default function AutoTradePanel() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={() => setAutoTradePanelOpen(false)} />
+      <div className="modal-backdrop absolute inset-0" onClick={() => setAutoTradePanelOpen(false)} />
 
-      <div className="relative w-full overflow-hidden border border-[var(--border)] bg-[var(--bg-panel)] shadow-[0_30px_90px_rgba(2,6,23,0.78)] sm:max-w-2xl sm:rounded-3xl">
+      <div className="premium-modal-shell relative w-full overflow-hidden sm:max-w-3xl sm:rounded-[28px]">
         {/* Header */}
-        <div className="flex items-center gap-4 border-b border-[var(--border-soft)] bg-gradient-to-r from-[rgba(15,21,32,0.96)] to-[rgba(22,27,39,0.92)] px-6 py-4">
+        <div className="relative z-10 flex items-center gap-4 border-b border-[var(--border-soft)] bg-gradient-to-r from-[rgba(12,18,36,0.98)] via-[rgba(17,24,44,0.96)] to-[rgba(12,18,36,0.98)] px-6 py-4">
           <div className="relative">
             <Bot className="h-6 w-6" style={{ color: modeColor }} />
             {autoTradeRunning && (
@@ -78,8 +78,12 @@ export default function AutoTradePanel() {
             <div className="flex items-center gap-3 text-lg font-bold text-[var(--text-main)]">
               Auto-Trade Bot
               <span
-                className="rounded-full border px-2.5 py-1 text-xs font-bold"
-                style={{ background: `color-mix(in srgb, ${modeColor} 12%, transparent)`, color: modeColor, borderColor: `color-mix(in srgb, ${modeColor} 36%, transparent)` }}
+                className="rounded-full border px-2.5 py-1 text-xs font-black tracking-[0.08em]"
+                style={{
+                  background: `color-mix(in srgb, ${modeColor} 12%, transparent)`,
+                  color: modeColor,
+                  borderColor: `color-mix(in srgb, ${modeColor} 38%, transparent)`,
+                }}
               >
                 {modeLabel}
               </span>
@@ -97,7 +101,7 @@ export default function AutoTradePanel() {
         </div>
 
         {/* Mode selector */}
-        <div className="grid grid-cols-3 gap-4 border-b border-[var(--border-soft)] px-5 py-5">
+        <div className="relative z-10 grid grid-cols-3 gap-3 border-b border-[var(--border-soft)] bg-[rgba(255,255,255,0.01)] px-5 py-5">
           {([
             { mode: 'off', label: '⛔ DỪNG', color: '#6b7280' },
             { mode: 'simulation', label: '🟡 PAPER TRADE', color: 'var(--color-warning)' },
@@ -114,8 +118,8 @@ export default function AutoTradePanel() {
                 }}
                 className={`rounded-2xl border py-3.5 text-sm font-bold transition-all ${
                   active
-                    ? 'text-[#04140f] shadow-lg'
-                    : 'border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)] hover:text-[#c9d7f4]'
+                    ? 'text-[#04140f] shadow-[0_10px_24px_rgba(0,0,0,0.3)]'
+                    : 'border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[#d9e7ff]'
                 }`}
                 style={active ? { background: color, borderColor: color } : {}}
               >
@@ -126,7 +130,7 @@ export default function AutoTradePanel() {
         </div>
 
         {/* Start / Stop Bot */}
-        <div className="border-b border-[var(--border-soft)] px-6 py-4">
+        <div className="relative z-10 border-b border-[var(--border-soft)] px-6 py-4">
           <button
             id="autotrade-start-stop-button"
             onClick={handleToggleRunning}
@@ -143,10 +147,10 @@ export default function AutoTradePanel() {
 
         {/* Kill Switch */}
         {autoTradeMode !== 'off' && (
-          <div className="border-b border-[rgba(246,70,93,0.28)] bg-[rgba(246,70,93,0.1)] px-6 py-4">
+          <div className="relative z-10 border-b border-[rgba(246,70,93,0.28)] bg-[rgba(246,70,93,0.1)] px-6 py-4">
             <button
               onClick={() => { setAutoTradeMode('off'); setAutoTradeRunning(false); toast.success('⛔ Đã dừng Auto-Trade!'); }}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 py-3.5 text-base font-bold text-white shadow-[0_12px_26px_rgba(246,70,93,0.35)] transition-all hover:from-red-600 hover:to-red-500"
+              className="premium-kill-btn inline-flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-bold text-white transition-all"
             >
               <StopCircle className="h-5 w-5" /> KILL SWITCH — Dừng khẩn cấp
             </button>
@@ -154,7 +158,7 @@ export default function AutoTradePanel() {
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-[var(--border-soft)]">
+        <div className="relative z-10 flex border-b border-[var(--border-soft)] bg-[rgba(255,255,255,0.01)]">
           {([
             { id: 'status', icon: Activity, label: 'Trạng thái' },
             { id: 'config', icon: Settings2, label: 'Cấu hình' },
@@ -164,10 +168,8 @@ export default function AutoTradePanel() {
             <button
               key={id}
               onClick={() => setConfigTab(id)}
-              className={`flex flex-1 items-center justify-center gap-2 py-4 text-sm font-bold transition-all ${
-                configTab === id
-                  ? 'border-b-2 border-[var(--color-brand)] bg-[rgba(0,82,255,0.1)] text-[#b7ceff]'
-                  : 'text-[var(--text-muted)] hover:text-[#d8e5ff]'
+              className={`premium-tab-btn flex flex-1 items-center justify-center gap-2 py-4 text-sm font-bold ${
+                configTab === id ? 'premium-tab-btn-active' : ''
               }`}
             >
               <Icon className="h-4 w-4" /> {label}
@@ -175,20 +177,20 @@ export default function AutoTradePanel() {
           ))}
         </div>
 
-        <div className="max-h-[36rem] space-y-0 overflow-y-auto p-6">
+        <div className="relative z-10 max-h-[36rem] space-y-0 overflow-y-auto p-6">
           {/* Status */}
           {configTab === 'status' && (
             <div className="space-y-5">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { label: 'Đang mở', value: activeOrders, color: 'var(--color-warning)' },
                   { label: 'Win Rate', value: `${winRate}%`, color: winRate >= 60 ? 'var(--color-success)' : 'var(--color-danger)' },
                   { label: 'Daily P&L', value: `${dailyPnL >= 0 ? '+' : ''}${dailyPnL.toFixed(1)}$`, color: dailyPnL >= 0 ? 'var(--color-success)' : 'var(--color-danger)' },
-                  { label: 'Logs', value: autoTradeLogs.length, color: '#9ca3af' },
+                  { label: 'Logs', value: autoTradeLogs.length, color: 'var(--text-secondary)' },
                 ].map(({ label, value, color }) => (
-                  <div key={label} className="coinbase-surface-soft rounded-xl p-4 text-center">
-                    <div className="mb-2 text-xs text-[var(--text-muted)]">{label}</div>
-                    <div className="text-lg font-bold" style={{ color }}>{value}</div>
+                  <div key={label} className="premium-stat-card rounded-xl p-4 text-center">
+                    <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</div>
+                    <div className="text-lg font-black" style={{ color }}>{value}</div>
                   </div>
                 ))}
               </div>
@@ -207,8 +209,8 @@ export default function AutoTradePanel() {
                 </div>
               </div>
 
-              <div className="coinbase-surface-soft rounded-xl p-4">
-                <div className="mb-3 text-xs uppercase tracking-wider text-[var(--text-muted)]">Đang theo dõi</div>
+              <div className="premium-section-card rounded-xl p-4">
+                <div className="mb-3 text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Đang theo dõi</div>
                 <div className="flex flex-wrap gap-2">
                   {autoTradeConfig.scanAllMarket ? (() => {
                     const trackedCount = Object.values(signals).filter(s => s.type !== 'NEUTRAL' && Date.now() - s.timestamp < 3600000).length;
@@ -253,7 +255,7 @@ export default function AutoTradePanel() {
                 { key: 'riskPercentPerTrade', label: 'Rủi ro mỗi lệnh', min: 0.5, max: 5, step: 0.5, color: '#f97316', suffix: '%' },
                 { key: 'maxConcurrentOrders', label: 'Lệnh đồng thời tối đa', min: 1, max: 10, step: 1, color: '#a855f7', suffix: '' },
               ].map(({ key, label, min, max, step, color, suffix }) => (
-                <div key={key} className="coinbase-surface-soft rounded-xl p-3.5">
+                <div key={key} className="premium-section-card rounded-xl p-3.5">
                   <div className="mb-1.5 flex justify-between">
                     <label className="text-xs text-[var(--text-muted)]">{label}</label>
                     <span className="text-xs font-bold" style={{ color }}>
@@ -289,7 +291,7 @@ export default function AutoTradePanel() {
                   { key: 'newsFilter', icon: Newspaper, label: 'News Filter', desc: 'Dừng khi có tin tức xấu' },
                   { key: 'trailingStop', icon: DollarSign, label: 'Trailing Stop', desc: 'Tự động kéo SL theo lợi nhuận' },
                 ].map(({ key, icon: Icon, label, desc }) => (
-                  <div key={key} className="coinbase-surface-soft flex items-center gap-3 rounded-xl p-3">
+                  <div key={key} className="premium-section-card flex items-center gap-3 rounded-xl p-3">
                     <Icon className="h-4 w-4 text-[var(--text-muted)]" />
                     <div className="flex-1">
                       <div className="text-xs font-medium text-[#d4ddf2]">{label}</div>
@@ -320,7 +322,7 @@ export default function AutoTradePanel() {
 
           {/* Logs */}
           {configTab === 'logs' && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {autoTradeLogs.length === 0 ? (
                 <div className="py-10 text-center text-sm text-[var(--text-muted)]">Chưa có lệnh auto-trade nào</div>
               ) : (
@@ -336,37 +338,37 @@ export default function AutoTradePanel() {
                   return (
                     <div
                       key={log.id}
-                      className={`flex flex-col gap-1 rounded-xl border p-2.5 text-xs transition-colors ${
-                        log.status === 'OPENED' ? 'border-blue-900/30 bg-blue-950/20' :
-                          log.status === 'TP_HIT' ? 'border-green-900/30 bg-green-950/20' :
-                            log.status === 'SL_HIT' ? 'border-red-900/30 bg-red-950/20' :
+                      className={`rounded-xl border p-3 text-xs transition-colors ${
+                        log.status === 'OPENED' ? 'border-[rgba(0,82,255,0.35)] bg-[rgba(0,82,255,0.1)]' :
+                          log.status === 'TP_HIT' ? 'border-[rgba(0,230,138,0.35)] bg-[rgba(0,230,138,0.1)]' :
+                            log.status === 'SL_HIT' ? 'border-[rgba(255,77,106,0.35)] bg-[rgba(255,77,106,0.1)]' :
                               'border-[var(--border)] bg-[rgba(22,27,39,0.72)]'
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-                          log.mode === 'simulation' ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400'
+                          log.mode === 'simulation' ? 'bg-yellow-900/50 text-yellow-300' : 'bg-red-900/50 text-red-300'
                         }`}>{log.mode === 'simulation' ? 'SIM' : 'LIVE'}</span>
                         <span className={`font-bold ${log.side === 'LONG' ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{log.side}</span>
-                        <span className="font-mono text-gray-400">{log.symbol.replace('_USDT', '')}</span>
-                        <span className="text-gray-600">@{log.entry.toFixed(4)}</span>
-                        <span className="border-l border-gray-700 pl-2 text-gray-600">{log.confidence}% conf</span>
+                        <span className="font-mono text-[var(--text-secondary)]">{log.symbol.replace('_USDT', '')}</span>
+                        <span className="text-[var(--text-muted)]">@{log.entry.toFixed(4)}</span>
+                        <span className="border-l border-[var(--border)] pl-2 text-[var(--text-muted)]">{log.confidence}% conf</span>
                         <span className={`ml-auto font-bold ${
-                          log.status === 'TP_HIT' ? 'text-green-400' :
-                            log.status === 'SL_HIT' ? 'text-red-400' :
-                              log.status === 'OPENED' ? 'text-blue-400' : 'text-gray-500'
+                          log.status === 'TP_HIT' ? 'text-[var(--color-success)]' :
+                            log.status === 'SL_HIT' ? 'text-[var(--color-danger)]' :
+                              log.status === 'OPENED' ? 'text-[var(--accent-soft)]' : 'text-[var(--text-muted)]'
                         }`}>{log.status}</span>
                       </div>
 
-                       <div className="mt-1 flex items-center justify-between pl-10">
+                      <div className="mt-1 flex items-center justify-between pl-10">
                         <div className="flex gap-4">
-                          <span className="font-mono text-gray-500">TP: {log.tp.toFixed(4)}</span>
-                          <span className="font-mono text-gray-500">SL: {log.sl.toFixed(4)}</span>
+                          <span className="font-mono text-[var(--text-muted)]">TP: {log.tp.toFixed(4)}</span>
+                          <span className="font-mono text-[var(--text-muted)]">SL: {log.sl.toFixed(4)}</span>
                         </div>
                       </div>
 
                       {log.aiAnalysis && (
-                        <div className="mt-1 border-l-2 border-gray-700 bg-black/30 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-blue-300/80 whitespace-pre-wrap">
+                        <div className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--border-soft)] bg-black/25 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-blue-200/80">
                           {log.aiAnalysis}
                         </div>
                       )}
@@ -400,7 +402,6 @@ export default function AutoTradePanel() {
 
           {/* Monthly Summary */}
           {configTab === 'summary' && (() => {
-            // Group by month
             const byMonth: Record<string, { trades: number; wins: number; pnl: number }> = {};
             autoTradeLogs.filter(l => ['TP_HIT', 'SL_HIT', 'CLOSED'].includes(l.status)).forEach(l => {
               const d = new Date(l.timestamp);
@@ -420,7 +421,7 @@ export default function AutoTradePanel() {
                     const { trades, wins, pnl } = byMonth[m];
                     const wr = trades > 0 ? Math.round((wins / trades) * 100) : 0;
                     return (
-                      <div key={m} className="coinbase-surface-soft flex items-center justify-between rounded-xl p-4">
+                      <div key={m} className="premium-section-card flex items-center justify-between rounded-xl p-4">
                         <div>
                           <div className="text-sm font-bold text-[#d4ddf2]">Tháng {m}</div>
                           <div className="mt-1 text-xs text-[var(--text-muted)]">{trades} lệnh đã đóng</div>

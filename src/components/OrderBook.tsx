@@ -73,69 +73,80 @@ export default function OrderBook() {
   const contractSize = contracts.find((contract) => contract.symbol === selectedSymbol)?.contractSize ?? 1;
 
   return (
-    <div className="flex flex-col h-full bg-[#0b0e14] text-white">
+    <div className="flex flex-col h-full bg-[var(--bg-panel)] text-[var(--text-main)] min-w-0">
       {/* Tabs */}
-      <div className="flex border-b border-[#1e2535] text-sm">
+      <div className="flex shrink-0 items-center border-b border-[var(--border-soft)] px-2 py-1.5 text-sm gap-0.5">
         <button onClick={() => setTab('book')}
-          className={`flex-1 py-2 ${tab === 'book' ? 'text-[#f0b90b] border-b-2 border-[#f0b90b]' : 'text-gray-600'}`}>
+          className={`relative flex-1 py-1.5 rounded-lg transition-all font-semibold text-xs whitespace-nowrap ${tab === 'book' ? 'text-[var(--color-brand)] bg-[var(--color-brand-dim)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface-soft)]'}`}>
           Order Book
+          {tab === 'book' && (
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-[var(--color-brand)]" />
+          )}
         </button>
         <button onClick={() => setTab('trades')}
-          className={`flex-1 py-2 ${tab === 'trades' ? 'text-[#f0b90b] border-b-2 border-[#f0b90b]' : 'text-gray-600'}`}>
-          Giao dịch gần đây
+          className={`relative flex-1 py-1.5 rounded-lg transition-all font-semibold text-xs whitespace-nowrap ${tab === 'trades' ? 'text-[var(--color-brand)] bg-[var(--color-brand-dim)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface-soft)]'}`}>
+          Giao dịch
+          {tab === 'trades' && (
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-[var(--color-brand)]" />
+          )}
         </button>
       </div>
 
       {tab === 'book' && (
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-3 text-xs text-gray-600 px-3 py-2 border-b border-[#0f1420]">
+          <div className="grid grid-cols-3 shrink-0 text-[10px] uppercase font-semibold tracking-wide text-[var(--text-muted)] px-3 py-2 border-b border-[var(--border-soft)]">
             <span>Giá (USDT)</span>
             <span className="text-center">Số lượng</span>
             <span className="text-right">Tổng</span>
           </div>
 
           {/* Asks (sells - red) reversed */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col-reverse">
             {[...asks].reverse().map((ask, i) => {
               const pct = (ask[1] / maxAskVol) * 100;
               return (
-                <div key={i} className="relative grid grid-cols-3 text-sm px-3 py-1 hover:bg-[#1e2535]">
-                  <div className="absolute inset-0 right-0 flex">
-                    <div className="ml-auto h-full bg-red-500/10" style={{ width: `${pct}%` }} />
+                <div key={i} className="relative grid grid-cols-3 text-[13px] px-3 py-[3px] hover:bg-[var(--bg-surface-soft)] cursor-pointer">
+                  <div className="absolute inset-0 right-0 flex pointer-events-none">
+                    <div className="ml-auto h-full bg-[var(--color-danger)] opacity-10 transition-all duration-300" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="font-mono text-[#f6465d] z-10">{formatPrice(ask[0])}</span>
-                  <span className="font-mono text-gray-400 text-center z-10">{ask[1].toLocaleString()}</span>
-                  <span className="font-mono text-gray-600 text-right z-10">{(ask[0] * ask[1] * contractSize).toFixed(2)}</span>
+                  <span className="font-mono font-bold text-[var(--color-danger)] z-10">{formatPrice(ask[0])}</span>
+                  <span className="font-mono text-[var(--text-secondary)] text-center z-10">{ask[1].toLocaleString()}</span>
+                  <span className="font-mono text-[var(--text-dim)] text-right z-10">{(ask[0] * ask[1] * contractSize).toFixed(2)}</span>
                 </div>
               );
             })}
           </div>
 
           {/* Spread / Current price */}
-          <div className="px-3 py-2 border-y border-[#1e2535] bg-[#0f1420]">
-            <div className={`text-lg font-bold font-mono ${ticker && ticker.riseFallRate >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+          <div className="px-3 py-2.5 shrink-0 border-y border-[var(--border-soft)] bg-[var(--bg-card)] flex items-center justify-between shadow-[0_0_12px_rgba(0,0,0,0.1)] z-10">
+            <div className={`text-xl font-bold font-mono tracking-tight drop-shadow-sm ${ticker && ticker.riseFallRate >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
               {ticker ? formatPrice(ticker.lastPrice) : '---'}
+              {ticker && (
+                <span className="text-xs ml-2 font-semibold bg-[currentColor] bg-opacity-10 px-1.5 py-0.5 rounded align-top">
+                  {ticker.riseFallRate >= 0 ? '+' : ''}{(ticker.riseFallRate * 100).toFixed(2)}%
+                </span>
+              )}
             </div>
             {orderBook && asks[0] && bids[0] && (
-              <div className="text-xs text-gray-600">
+              <div className="text-[10px] text-[var(--text-muted)] font-mono font-medium bg-[var(--bg-surface-soft)] px-2 py-0.5 rounded">
                 Spread: {(asks[0][0] - bids[0][0]).toFixed(4)}
               </div>
             )}
           </div>
 
           {/* Bids (buys - green) */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
             {bids.map((bid, i) => {
               const pct = (bid[1] / maxBidVol) * 100;
               return (
-                <div key={i} className="relative grid grid-cols-3 text-sm px-3 py-1 hover:bg-[#1e2535]">
-                  <div className="absolute inset-0 right-0 flex">
-                    <div className="ml-auto h-full bg-green-500/10" style={{ width: `${pct}%` }} />
+                <div key={i} className="relative grid grid-cols-3 text-[13px] px-3 py-[3px] hover:bg-[var(--bg-surface-soft)] cursor-pointer">
+                  <div className="absolute inset-0 right-0 flex pointer-events-none">
+                    <div className="ml-auto h-full bg-[var(--color-success)] opacity-10 transition-all duration-300" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="font-mono text-[#0ecb81] z-10">{formatPrice(bid[0])}</span>
-                  <span className="font-mono text-gray-400 text-center z-10">{bid[1].toLocaleString()}</span>
-                  <span className="font-mono text-gray-600 text-right z-10">{(bid[0] * bid[1] * contractSize).toFixed(2)}</span>
+                  <span className="font-mono font-bold text-[var(--color-success)] z-10">{formatPrice(bid[0])}</span>
+                  <span className="font-mono text-[var(--text-secondary)] text-center z-10">{bid[1].toLocaleString()}</span>
+                  <span className="font-mono text-[var(--text-dim)] text-right z-10">{(bid[0] * bid[1] * contractSize).toFixed(2)}</span>
                 </div>
               );
             })}
@@ -144,15 +155,15 @@ export default function OrderBook() {
       )}
 
       {tab === 'trades' && (
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-3 text-xs text-gray-600 px-3 py-2 border-b border-[#0f1420] sticky top-0 bg-[#0b0e14]">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="grid grid-cols-3 text-[10px] uppercase font-semibold tracking-wide text-[var(--text-muted)] px-3 py-2 border-b border-[var(--border-soft)] sticky top-0 bg-[var(--bg-panel)] z-20 backdrop-blur-md">
             <span>Giá</span><span className="text-center">Qty</span><span className="text-right">Thời gian</span>
           </div>
           {trades.map((trade, i) => (
-            <div key={i} className="grid grid-cols-3 text-sm px-3 py-1 hover:bg-[#1e2535]">
-              <span className={`font-mono ${trade.T === 1 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>{formatPrice(trade.p)}</span>
-              <span className="font-mono text-gray-400 text-center">{trade.v}</span>
-              <span className="font-mono text-gray-600 text-right">{formatTime(trade.t)}</span>
+            <div key={i} className="grid grid-cols-3 text-[13px] px-3 py-1.5 hover:bg-[var(--bg-surface-soft)] border-b border-[var(--border-soft)] border-opacity-50">
+              <span className={`font-mono font-bold ${trade.T === 1 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{formatPrice(trade.p)}</span>
+              <span className="font-mono text-[var(--text-secondary)] text-center">{trade.v}</span>
+              <span className="font-mono text-[var(--text-dim)] text-right">{formatTime(trade.t)}</span>
             </div>
           ))}
         </div>

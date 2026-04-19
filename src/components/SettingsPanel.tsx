@@ -1,150 +1,239 @@
-import { Key, Bot, BookOpen, Newspaper, ExternalLink, Shield, Brain, BarChart2 } from 'lucide-react';
+import {
+  Key,
+  Bot,
+  BookOpen,
+  Newspaper,
+  ExternalLink,
+  Shield,
+  Brain,
+  BarChart2,
+  Sparkles,
+  CheckCircle2,
+} from 'lucide-react';
 import { AI_PROVIDERS } from '../types';
 import { useSettingsPanelState } from '../store/hooks';
 
 export default function SettingsPanel() {
-  const { setApiModalOpen, setAutoTradePanelOpen, setActiveTab, aiCredentials, autoTradeMode, autoTradeConfig } = useSettingsPanelState();
+  const {
+    setApiModalOpen,
+    setAutoTradePanelOpen,
+    setActiveTab,
+    aiCredentials,
+    autoTradeMode,
+    autoTradeConfig,
+  } = useSettingsPanelState();
 
-  const activeAiProviders = AI_PROVIDERS.filter(p => aiCredentials?.[p.id]);
-  const hasAny = activeAiProviders.length > 0;
+  const activeAiProviders = AI_PROVIDERS.filter((provider) => aiCredentials?.[provider.id]);
+  const hasAnyProviders = activeAiProviders.length > 0;
+
+  const modeTone =
+    autoTradeMode === 'live'
+      ? 'border-[rgba(255,77,106,0.42)] bg-[var(--color-danger-dim)] text-[var(--color-danger)]'
+      : autoTradeMode === 'simulation'
+        ? 'border-[rgba(255,184,46,0.42)] bg-[var(--color-warning-dim)] text-[var(--color-warning)]'
+        : 'border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)]';
 
   return (
-    <div className="p-6 text-white max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-[#f0b90b]/10 flex items-center justify-center">
-          <BarChart2 className="w-6 h-6 text-[#f0b90b]" />
-        </div>
-        <div>
-          <h2 className="font-black text-xl">Cài đặt hệ thống</h2>
-          <p className="text-sm text-gray-500 mt-1">MEXC Pro Futures Terminal v2.0</p>
-        </div>
-      </div>
+    <div className="flex h-full flex-col gap-4 overflow-y-auto bg-[var(--bg-panel)] p-4 text-[var(--text-main)]">
+      <section className="coinbase-surface rounded-2xl p-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[rgba(255,184,46,0.36)] bg-[var(--color-warning-dim)]">
+            <BarChart2 className="h-5 w-5 text-[var(--color-warning)]" />
+          </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* API Keys */}
-        <button onClick={() => setApiModalOpen(true)}
-          className="flex items-center gap-5 p-5 bg-[#161b25] border border-[#2a3045] rounded-2xl hover:border-[#f0b90b]/40 hover:bg-[#f0b90b]/5 transition-all text-left group">
-          <div className="w-12 h-12 rounded-xl bg-[#f0b90b]/10 flex items-center justify-center shrink-0 group-hover:bg-[#f0b90b]/20 transition-colors">
-            <Key className="w-6 h-6 text-[#f0b90b]" />
+          <div>
+            <h2 className="text-base font-bold tracking-tight">System Configuration Center</h2>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+              MEXC Pro Futures Terminal • Runtime & AI orchestration
+            </p>
           </div>
-          <div className="min-w-0">
-            <div className="font-bold text-base text-white">API Keys</div>
-            <div className="text-sm text-gray-500 truncate mt-1">MEXC + AI Providers</div>
+
+          <div className="ml-auto inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-surface-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em]">
+            <span className={`inline-flex rounded-full border px-2 py-0.5 ${modeTone}`}>{autoTradeMode.toUpperCase()}</span>
+            <span className="text-[var(--text-muted)]">Auto-Trade Mode</span>
           </div>
-          <ExternalLink className="w-5 h-5 text-gray-600 ml-auto shrink-0 group-hover:text-gray-400" />
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <button
+          id="settings-api-keys-button"
+          onClick={() => setApiModalOpen(true)}
+          className="coinbase-surface group rounded-2xl p-4 text-left transition-all hover:-translate-y-[1px] hover:border-[rgba(255,184,46,0.42)]"
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-[rgba(255,184,46,0.4)] bg-[var(--color-warning-dim)]">
+              <Key className="h-4.5 w-4.5 text-[var(--color-warning)]" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-[var(--text-main)]">API Keys</div>
+              <div className="text-[11px] text-[var(--text-muted)]">MEXC + AI provider credentials</div>
+            </div>
+            <ExternalLink className="ml-auto h-4 w-4 text-[var(--text-muted)] transition-colors group-hover:text-[var(--color-warning)]" />
+          </div>
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+            Quản lý khóa API để kích hoạt giao dịch live và nâng cấp chất lượng phân tích AI.
+          </p>
         </button>
 
-        {/* Auto-Trade */}
-        <button onClick={() => setAutoTradePanelOpen(true)}
-          className="flex items-center gap-5 p-5 bg-[#161b25] border border-[#2a3045] rounded-2xl hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left group">
-          <div className="w-12 h-12 rounded-xl bg-blue-900/30 flex items-center justify-center shrink-0">
-            <Bot className="w-6 h-6 text-blue-400" />
+        <button
+          id="settings-auto-trade-button"
+          onClick={() => setAutoTradePanelOpen(true)}
+          className="coinbase-surface group rounded-2xl p-4 text-left transition-all hover:-translate-y-[1px] hover:border-[rgba(0,82,255,0.42)]"
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-[rgba(0,82,255,0.4)] bg-[var(--color-brand-dim)]">
+              <Bot className="h-4.5 w-4.5 text-[var(--color-brand)]" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-[var(--text-main)]">Auto-Trade Bot</div>
+              <div className="text-[11px] text-[var(--text-muted)]">Risk rules, schedule & execution</div>
+            </div>
+            <ExternalLink className="ml-auto h-4 w-4 text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-soft)]" />
           </div>
-          <div className="min-w-0">
-            <div className="font-bold text-base text-white">Auto-Trade Bot</div>
-            <div className="text-sm text-gray-500 mt-1">
-              {autoTradeMode !== 'off'
-                ? <span className={autoTradeMode === 'live' ? 'text-red-400' : 'text-yellow-400'}>● {autoTradeMode.toUpperCase()} đang chạy</span>
-                : 'Tắt — kích hoạt tại đây'}
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+            Điều chỉnh thông số chiến lược tự động: confidence, risk per trade, daily loss và bộ lọc tin tức.
+          </p>
+        </button>
+
+        <button
+          id="settings-news-button"
+          onClick={() => setActiveTab('news')}
+          className="coinbase-surface group rounded-2xl p-4 text-left transition-all hover:-translate-y-[1px] hover:border-[rgba(34,211,238,0.42)]"
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-[rgba(34,211,238,0.4)] bg-[rgba(34,211,238,0.1)]">
+              <Newspaper className="h-4.5 w-4.5 text-[var(--color-cyan)]" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-[var(--text-main)]">News & Sentiment</div>
+              <div className="text-[11px] text-[var(--text-muted)]">CryptoPanic + market sentiment</div>
+            </div>
+            <ExternalLink className="ml-auto h-4 w-4 text-[var(--text-muted)] transition-colors group-hover:text-[var(--color-cyan)]" />
+          </div>
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+            Theo dõi luồng tin nóng và mood thị trường để hỗ trợ quyết định vào lệnh.
+          </p>
+        </button>
+
+        <div className="coinbase-surface rounded-2xl p-4">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-[rgba(139,92,246,0.4)] bg-[rgba(139,92,246,0.1)]">
+              <BookOpen className="h-4.5 w-4.5 text-[#d8b8ff]" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-[var(--text-main)]">Tài liệu hướng dẫn</div>
+              <div className="text-[11px] text-[var(--text-muted)]">Playbook vận hành hệ thống</div>
             </div>
           </div>
-          <ExternalLink className="w-5 h-5 text-gray-600 ml-auto shrink-0 group-hover:text-gray-400" />
-        </button>
-
-        {/* News */}
-        <button onClick={() => setActiveTab('news')}
-          className="flex items-center gap-5 p-5 bg-[#161b25] border border-[#2a3045] rounded-2xl hover:border-orange-500/40 hover:bg-orange-500/5 transition-all text-left group">
-          <div className="w-12 h-12 rounded-xl bg-orange-900/20 flex items-center justify-center shrink-0">
-            <Newspaper className="w-6 h-6 text-orange-400" />
-          </div>
-          <div className="min-w-0">
-            <div className="font-bold text-base text-white">Tin tức & Sentiment</div>
-            <div className="text-sm text-gray-500 mt-1">CryptoPanic + CryptoCompare</div>
-          </div>
-          <ExternalLink className="w-5 h-5 text-gray-600 ml-auto shrink-0 group-hover:text-gray-400" />
-        </button>
-
-        {/* User Guide */}
-        <div className="flex items-center gap-5 p-5 bg-[#161b25] border border-[#2a3045] rounded-2xl">
-          <div className="w-12 h-12 rounded-xl bg-purple-900/20 flex items-center justify-center shrink-0">
-            <BookOpen className="w-6 h-6 text-purple-400" />
-          </div>
-          <div className="min-w-0">
-            <div className="font-bold text-base text-white">Hướng dẫn sử dụng</div>
-            <div className="text-sm text-gray-500 mt-1">Xem file HDSD.md</div>
-          </div>
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+            Mở file <strong>HDSD.md</strong> để xem luồng thiết lập, checklist an toàn và best practices trước khi trade live.
+          </p>
         </div>
-      </div>
+      </section>
 
-      {/* AI Provider Status */}
-      <div className="bg-[#161b25] border border-[#2a3045] rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Brain className="w-5 h-5 text-[#f0b90b]" />
-          <span className="font-bold text-base">AI Provider Status</span>
-          {hasAny
-            ? <span className="text-xs bg-green-900/50 text-green-400 px-3 py-1 rounded-full ml-auto">{activeAiProviders.length} provider active</span>
-            : <span className="text-xs bg-gray-900 text-gray-500 px-3 py-1 rounded-full ml-auto">Chưa cấu hình</span>}
+      <section className="coinbase-surface rounded-2xl p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <Brain className="h-4 w-4 text-[var(--accent-soft)]" />
+            AI Provider Matrix
+          </div>
+
+          {hasAnyProviders ? (
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,230,138,0.42)] bg-[var(--color-success-dim)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-success)]">
+              <CheckCircle2 className="h-3 w-3" />
+              {activeAiProviders.length} active
+            </span>
+          ) : (
+            <span className="ml-auto inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--bg-main)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              Not configured
+            </span>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {AI_PROVIDERS.map(provider => {
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {AI_PROVIDERS.map((provider) => {
             const active = !!aiCredentials?.[provider.id];
             return (
-              <div key={provider.id} className={`flex items-center gap-3 p-3 rounded-xl border ${active ? 'border-current/20' : 'border-[#2a3045]'}`}
-                style={active ? { borderColor: provider.color + '40', background: provider.color + '10' } : {}}>
-                <div className="w-3 h-3 rounded-full" style={{ background: active ? provider.color : '#3a4055' }} />
-                <span className="text-sm font-medium" style={{ color: active ? provider.color : '#6b7280' }}>{provider.name.split(' ')[0]}</span>
-                {active && <span className="text-[10px] text-gray-500 ml-auto">{provider.freeLimit.split('/')[0]}</span>}
+              <div
+                key={provider.id}
+                className={`rounded-xl border px-3 py-2.5 ${
+                  active
+                    ? 'bg-[var(--bg-main)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]'
+                    : 'border-[var(--border-soft)] bg-[var(--bg-surface-soft)]'
+                }`}
+                style={active ? { borderColor: `${provider.color}55` } : undefined}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: active ? provider.color : 'var(--text-muted)' }}
+                  />
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: active ? provider.color : 'var(--text-secondary)' }}
+                  >
+                    {provider.name}
+                  </span>
+                  <span className="ml-auto text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    {active ? 'Active' : 'Off'}
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-[var(--text-muted)]">{provider.freeLimit}</div>
               </div>
             );
           })}
         </div>
-        {!hasAny && (
-          <button onClick={() => setApiModalOpen(true)}
-            className="w-full mt-4 py-3 bg-[#f0b90b]/10 border border-[#f0b90b]/30 text-[#f0b90b] rounded-xl text-sm font-bold hover:bg-[#f0b90b]/20 transition-colors">
-            + Thêm AI API Key (Miễn phí)
+
+        {!hasAnyProviders && (
+          <button
+            id="settings-add-ai-key-button"
+            onClick={() => setApiModalOpen(true)}
+            className="coinbase-pill-btn mt-3 w-full border-[rgba(0,82,255,0.45)] bg-[var(--color-brand)] py-2.5 text-xs font-extrabold uppercase tracking-[0.08em] text-white shadow-[0_12px_24px_rgba(0,82,255,0.32)] hover:bg-[var(--color-brand-hover)]"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              Thêm AI API Key
+            </span>
           </button>
         )}
-      </div>
+      </section>
 
-      {/* Auto-trade quick status */}
-      <div className="bg-[#161b25] border border-[#2a3045] rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Bot className="w-5 h-5 text-blue-400" />
-          <span className="font-bold text-base">Auto-Trade Config</span>
+      <section className="coinbase-surface-soft rounded-2xl p-4">
+        <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+          <Bot className="h-4 w-4 text-[var(--color-brand)]" />
+          Auto-Trade Configuration Snapshot
         </div>
-        <div className="grid grid-cols-2 gap-3 text-sm">
+
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {[
-            { label: 'Min Confidence', value: `${autoTradeConfig.minConfidence}%` },
-            { label: 'Risk/trade', value: `${autoTradeConfig.riskPercentPerTrade}%` },
-            { label: 'Lệnh đồng thời', value: autoTradeConfig.maxConcurrentOrders },
-            { label: 'Daily Loss Limit', value: `${autoTradeConfig.dailyLossLimit} USDT` },
-            { label: 'News Filter', value: autoTradeConfig.newsFilter ? '✅ Bật' : '❌ Tắt' },
-            { label: 'Trailing Stop', value: autoTradeConfig.trailingStop ? '✅ Bật' : '❌ Tắt' },
+            { label: 'Min confidence', value: `${autoTradeConfig.minConfidence}%` },
+            { label: 'Risk per trade', value: `${autoTradeConfig.riskPercentPerTrade}%` },
+            { label: 'Max concurrent orders', value: autoTradeConfig.maxConcurrentOrders },
+            { label: 'Daily loss limit', value: `${autoTradeConfig.dailyLossLimit} USDT` },
+            { label: 'News filter', value: autoTradeConfig.newsFilter ? 'Enabled' : 'Disabled' },
+            { label: 'Trailing stop', value: autoTradeConfig.trailingStop ? 'Enabled' : 'Disabled' },
           ].map(({ label, value }) => (
-            <div key={label} className="flex justify-between p-3 bg-[#0b0e14] rounded-xl">
-              <span className="text-gray-500">{label}</span>
-              <span className="font-bold text-gray-300">{value}</span>
+            <div key={label} className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">{label}</span>
+              <span className="font-mono font-bold text-[var(--text-main)]">{value}</span>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Security */}
-      <div className="flex items-start gap-4 p-5 bg-[#0b0e14] border border-[#2a3045] rounded-2xl">
-        <Shield className="w-6 h-6 text-green-500 shrink-0 mt-0.5" />
-        <div>
-          <div className="font-semibold text-base text-green-400 mb-1.5">Keys được bảo vệ an toàn</div>
-          <div className="text-sm text-gray-500 leading-relaxed">
-            Tất cả API keys lưu cục bộ trong trình duyệt, không gửi đến bất kỳ server nào.
-            Không bao giờ chia sẻ Secret Key với bất kỳ ai.
+      <section className="rounded-2xl border border-[rgba(0,230,138,0.35)] bg-[linear-gradient(150deg,rgba(0,230,138,0.1),rgba(11,16,30,0.96))] p-4">
+        <div className="flex items-start gap-3">
+          <Shield className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-success)]" />
+          <div>
+            <h3 className="text-sm font-bold text-[var(--color-success)]">Security Policy</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+              API keys được lưu cục bộ trong trình duyệt. Không gửi đến server bên thứ ba.
+              Luôn bảo mật Secret Key và chỉ cấp quyền tối thiểu cần thiết.
+            </p>
           </div>
         </div>
-      </div>
-
-      <div className="text-center text-[10px] text-gray-700">
-        MEXC Pro Futures Terminal v2.0 • Developed with ❤️ • Not financial advice
-      </div>
+      </section>
     </div>
   );
 }

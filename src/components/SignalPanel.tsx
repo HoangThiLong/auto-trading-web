@@ -5,7 +5,20 @@ import { analyzeWithAI } from '../services/geminiAi';
 import { fetchKlines } from '../services/mexcApi';
 import { fetchTimesFmForecast } from '../services/timesfmService';
 import { AI_PROVIDERS, type CandlePoint, type TradeSignal } from '../types';
-import { Brain, TrendingUp, TrendingDown, Minus, RefreshCw, AlertTriangle, CheckCircle, Sparkles, Target, BarChart2, Zap } from 'lucide-react';
+import {
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle,
+  Sparkles,
+  Target,
+  BarChart2,
+  Zap,
+  Activity,
+} from 'lucide-react';
 
 interface Props {
   candles: CandlePoint[];
@@ -14,37 +27,72 @@ interface Props {
 
 function Gauge({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' }) {
   const pct = Math.max(0, Math.min(100, value));
-  const color = pct >= 70 ? '#0ecb81' : pct >= 50 ? '#f0b90b' : '#f6465d';
-  const r = size === 'sm' ? 22 : 34;
-  const circ = 2 * Math.PI * r;
-  const strokeDash = (pct / 100) * circ * 0.75;
-  const dim = size === 'sm' ? 'w-16 h-16' : 'w-22 h-22';
+  const color =
+    pct >= 70
+      ? 'var(--color-success)'
+      : pct >= 50
+        ? 'var(--color-warning)'
+        : 'var(--color-danger)';
+  const radius = size === 'sm' ? 23 : 32;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (pct / 100) * circumference * 0.75;
+  const dimension = size === 'sm' ? 68 : 92;
 
   return (
-    <div className={`relative flex items-center justify-center ${dim}`} style={{ width: size === 'sm' ? 64 : 88, height: size === 'sm' ? 64 : 88 }}>
-      <svg className="w-full h-full" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#1e2535" strokeWidth="8"
-          strokeDasharray={`${circ * 0.75} ${circ}`} strokeDashoffset={0} strokeLinecap="round"
-          transform="rotate(135 50 50)" />
-        <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8"
-          strokeDasharray={`${strokeDash} ${circ}`} strokeDashoffset={0} strokeLinecap="round"
-          transform="rotate(135 50 50)" style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+    <div
+      className="relative grid place-items-center"
+      style={{ width: dimension, height: dimension }}
+    >
+      <svg className="h-full w-full" viewBox="0 0 100 100">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke="rgba(99, 115, 155, 0.28)"
+          strokeWidth="8"
+          strokeDasharray={`${circumference * 0.75} ${circumference}`}
+          strokeLinecap="round"
+          transform="rotate(135 50 50)"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeDasharray={`${progress} ${circumference}`}
+          strokeLinecap="round"
+          transform="rotate(135 50 50)"
+          style={{ transition: 'stroke-dasharray 400ms ease' }}
+        />
       </svg>
       <div className="absolute text-center">
-        <div className="font-black leading-none" style={{ color, fontSize: size === 'sm' ? 14 : 20 }}>{pct}%</div>
-        <div className="text-xs text-gray-600 mt-0.5">Tin cậy</div>
+        <div className="text-lg font-black leading-none" style={{ color }}>
+          {pct}%
+        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+          Độ tin cậy
+        </div>
       </div>
     </div>
   );
 }
 
 function WinRateBadge({ rate }: { rate: number }) {
-  const color = rate >= 60 ? '#0ecb81' : rate >= 50 ? '#f0b90b' : '#f6465d';
+  const tone =
+    rate >= 60
+      ? 'border-[rgba(0,230,138,0.45)] bg-[var(--color-success-dim)] text-[var(--color-success)]'
+      : rate >= 50
+        ? 'border-[rgba(255,184,46,0.45)] bg-[var(--color-warning-dim)] text-[var(--color-warning)]'
+        : 'border-[rgba(255,77,106,0.45)] bg-[var(--color-danger-dim)] text-[var(--color-danger)]';
+
   return (
-    <div className="flex items-center gap-1 text-sm font-bold" style={{ color }}>
-      <Target className="w-4 h-4" />
-      {rate}% win
-    </div>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${tone}`}>
+      <Target className="h-3.5 w-3.5" />
+      Win rate {rate}%
+    </span>
   );
 }
 
@@ -80,8 +128,12 @@ export default function SignalPanel({ candles, onPlaceOrder }: Props) {
         const klines = await fetchKlines(selectedSymbol, 'Min15', 300);
         if (klines) {
           data = klines.time.map((t, i) => ({
-            time: t, open: klines.open[i], high: klines.high[i],
-            low: klines.low[i], close: klines.close[i], volume: klines.vol[i],
+            time: t,
+            open: klines.open[i],
+            high: klines.high[i],
+            low: klines.low[i],
+            close: klines.close[i],
+            volume: klines.vol[i],
           }));
         }
       }
@@ -89,21 +141,28 @@ export default function SignalPanel({ candles, onPlaceOrder }: Props) {
 
       const sig = await analyzeWithWorker(data);
 
-      // Enhance with AI if available
       if (withAI && aiCredentials) {
         setAiLoading(true);
         try {
-          const marketContext: { volumeTrend: 'increasing' | 'decreasing' | 'neutral', volatility: 'high' | 'normal' | 'low' } = {
+          const marketContext: {
+            volumeTrend: 'increasing' | 'decreasing' | 'neutral';
+            volatility: 'high' | 'normal' | 'low';
+          } = {
             volumeTrend: 'increasing',
-            volatility: sig.indicators?.marketRegime === 'VOLATILE' ? 'high' :
-              sig.indicators?.marketRegime === 'TRENDING' ? 'normal' : 'low'
+            volatility:
+              sig.indicators?.marketRegime === 'VOLATILE'
+                ? 'high'
+                : sig.indicators?.marketRegime === 'TRENDING'
+                  ? 'normal'
+                  : 'low',
           };
 
-          // Fetch TimesFm forecast
           let timesFmForecast: number[] | null = null;
           try {
-            timesFmForecast = await fetchTimesFmForecast(data.map(c => c.close), 12);
-          } catch (e) { console.error('TimesFm failed', e); }
+            timesFmForecast = await fetchTimesFmForecast(data.map((c) => c.close), 12);
+          } catch (error) {
+            console.error('TimesFm failed', error);
+          }
 
           const aiResult = await analyzeWithAI(
             aiCredentials,
@@ -113,10 +172,11 @@ export default function SignalPanel({ candles, onPlaceOrder }: Props) {
             sig.entry,
             tradeLessons || [],
             timesFmForecast,
-            marketContext
+            marketContext,
           );
+
           if (aiResult) {
-            const providerInfo = AI_PROVIDERS.find(p => p.id === aiResult.provider);
+            const providerInfo = AI_PROVIDERS.find((provider) => provider.id === aiResult.provider);
             sig.aiAnalysis = aiResult.analysis;
             sig.aiProvider = providerInfo?.name || aiResult.provider;
             sig.confidence = Math.round((sig.confidence + aiResult.confidence) / 2);
@@ -138,29 +198,32 @@ export default function SignalPanel({ candles, onPlaceOrder }: Props) {
 
   const scanMarket = async () => {
     setScanning(true);
-    // Focus on potential coins by volume & volatility (top 24 active USDT pairs)
     const targets = tickers
-      .filter(t => t.symbol.endsWith('_USDT'))
+      .filter((ticker) => ticker.symbol.endsWith('_USDT'))
       .sort((a, b) => b.amount24 - a.amount24)
       .slice(0, 24)
-      .map(t => t.symbol);
+      .map((ticker) => ticker.symbol);
 
     const results: Record<string, TradeSignal> = {};
 
-    for (const sym of targets) {
+    for (const symbol of targets) {
       try {
-        const klines = await fetchKlines(sym, 'Min15', 200);
+        const klines = await fetchKlines(symbol, 'Min15', 200);
         if (klines && klines.time?.length >= 50) {
-          const cds: CandlePoint[] = klines.time.map((t, i) => ({
-            time: t, open: klines.open[i], high: klines.high[i],
-            low: klines.low[i], close: klines.close[i], volume: klines.vol[i],
+          const chartCandles: CandlePoint[] = klines.time.map((time, index) => ({
+            time,
+            open: klines.open[index],
+            high: klines.high[index],
+            low: klines.low[index],
+            close: klines.close[index],
+            volume: klines.vol[index],
           }));
-          const computedSignal = await analyzeWithWorker(cds);
-          results[sym] = computedSignal;
-          setSignal(sym, computedSignal);
+          const computedSignal = await analyzeWithWorker(chartCandles);
+          results[symbol] = computedSignal;
+          setSignal(symbol, computedSignal);
         }
       } catch {
-        // skip symbol on failure
+        // Skip failed symbol
       }
     }
 
@@ -181,241 +244,336 @@ export default function SignalPanel({ candles, onPlaceOrder }: Props) {
     return () => clearInterval(interval);
   }, [signalScanInterval]);
 
-  const typeBg = (t: TradeSignal['type']) =>
-    t === 'LONG' ? 'bg-green-950/40 border-green-800/50' :
-    t === 'SHORT' ? 'bg-red-950/40 border-red-800/50' :
-    'bg-[#1a2235] border-[#2a3045]';
+  const typeBg = (type: TradeSignal['type']) =>
+    type === 'LONG'
+      ? 'border-[rgba(0,230,138,0.42)] bg-[linear-gradient(145deg,rgba(0,230,138,0.17),rgba(6,11,22,0.9))]'
+      : type === 'SHORT'
+        ? 'border-[rgba(255,77,106,0.42)] bg-[linear-gradient(145deg,rgba(255,77,106,0.17),rgba(6,11,22,0.9))]'
+        : 'border-[var(--border)] bg-[linear-gradient(145deg,rgba(0,82,255,0.08),rgba(6,11,22,0.9))]';
 
-  const typeText = (t: TradeSignal['type']) =>
-    t === 'LONG' ? 'text-[#0ecb81]' : t === 'SHORT' ? 'text-[#f6465d]' : 'text-gray-500';
+  const typeText = (type: TradeSignal['type']) =>
+    type === 'LONG'
+      ? 'text-[var(--color-success)]'
+      : type === 'SHORT'
+        ? 'text-[var(--color-danger)]'
+        : 'text-[var(--text-muted)]';
 
-  const typeIcon = (t: TradeSignal['type']) =>
-    t === 'LONG' ? <TrendingUp className="w-5 h-5 text-[#0ecb81]" /> :
-    t === 'SHORT' ? <TrendingDown className="w-5 h-5 text-[#f6465d]" /> :
-    <Minus className="w-5 h-5 text-gray-500" />;
+  const typeIcon = (type: TradeSignal['type']) =>
+    type === 'LONG' ? (
+      <TrendingUp className="h-5 w-5 text-[var(--color-success)]" />
+    ) : type === 'SHORT' ? (
+      <TrendingDown className="h-5 w-5 text-[var(--color-danger)]" />
+    ) : (
+      <Minus className="h-5 w-5 text-[var(--text-muted)]" />
+    );
 
   return (
-    <div className="flex flex-col gap-3 p-3 text-white h-full overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Brain className="w-5 h-5 text-[#f0b90b]" />
-          <span className="font-bold text-base text-[#f0b90b]">AI Signal Engine</span>
-          {aiCredentials && Object.values(aiCredentials).some(v => v) && (
-            <span className="text-[10px] bg-blue-900/50 text-blue-400 px-2 py-1 rounded-full flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Multi-AI
-            </span>
-          )}
-        </div>
-        <div className="flex gap-1.5 items-center">
-          <select 
-            value={signalScanInterval} 
-            onChange={e => setSignalScanInterval(Number(e.target.value))}
-            className="text-xs bg-[#161b25] border border-[#2a3045] rounded-lg px-2 py-1.5 focus:outline-none"
-          >
-            <option value={0}>Auto off</option>
-            <option value={1}>1m</option>
-            <option value={5}>5m</option>
-            <option value={15}>15m</option>
-            <option value={30}>30m</option>
-          </select>
-          <button onClick={scanMarket} disabled={scanning}
-            className="text-sm px-3 py-1.5 bg-purple-900/50 text-purple-300 border border-purple-800/50 rounded-lg hover:bg-purple-800/50 transition-colors flex items-center gap-1">
-            <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-            Scan ({tickers.filter(t => t.symbol.endsWith('_USDT')).length > 24 ? '24 pairs' : 'Tất cả'})
-          </button>
-          <button onClick={() => analyze(true)} disabled={isAnalyzing || aiLoading}
-            className="text-sm px-4 py-1.5 bg-[#f0b90b] text-black rounded-lg font-bold hover:bg-[#d4a517] transition-colors flex items-center gap-1 disabled:opacity-60">
-            {(isAnalyzing || aiLoading)
-              ? <><Zap className="w-4 h-4 animate-pulse" /> Đang phân tích...</>
-              : <><Brain className="w-4 h-4" /> Phân tích AI</>}
-          </button>
-        </div>
-      </div>
-
-      {/* Current signal */}
-      {signal ? (
-        <div className={`rounded-xl border p-3.5 ${typeBg(signal.type)}`}>
-          {/* Top row: direction + gauge */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                {typeIcon(signal.type)}
-                <span className={`text-2xl font-black ${typeText(signal.type)}`}>{signal.type}</span>
-                <span className={`text-sm font-bold px-2.5 py-1 rounded-full border ${
-                  signal.type === 'LONG' ? 'border-green-700/50 text-green-400' :
-                  signal.type === 'SHORT' ? 'border-red-700/50 text-red-400' :
-                  'border-gray-700 text-gray-500'
-                }`}>{signal.strength}</span>
-              </div>
-              {signal.winRate !== undefined && <WinRateBadge rate={signal.winRate} />}
-              {signal.aiProvider && (
-                <div className="text-xs text-blue-400 flex items-center gap-1 mt-1">
-                  <Sparkles className="w-3 h-3" /> {signal.aiProvider}
-                </div>
-              )}
+    <div className="flex h-full flex-col gap-4 overflow-y-auto bg-[var(--bg-panel)] p-4 text-[var(--text-main)]">
+      <section className="coinbase-surface rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-[rgba(0,82,255,0.4)] bg-[var(--color-brand-dim)]">
+              <Brain className="h-5 w-5 text-[var(--color-brand)]" />
             </div>
-            <Gauge value={signal.confidence} />
-          </div>
-
-          {/* AI Analysis box */}
-          {signal.aiAnalysis && (
-            <div className="mb-4 p-3 bg-blue-950/30 border border-blue-900/40 rounded-lg">
-              <div className="text-xs text-blue-400 font-bold mb-1.5 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> NHẬN ĐỊNH AI
-              </div>
-              <p className="text-sm text-blue-200 leading-relaxed">{signal.aiAnalysis}</p>
+            <div>
+              <h2 className="text-base font-bold tracking-tight">AI Signal Engine</h2>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                {selectedSymbol.replace('_', '/')} • Phân tích kỹ thuật + AI đa mô hình
+              </p>
             </div>
-          )}
-
-          {/* Entry / TP / SL */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-[#0b0e1480] rounded-lg p-3 text-center">
-              <div className="text-xs text-gray-500 mb-1 uppercase">Entry</div>
-              <div className="text-base font-mono font-bold text-white">{signal.entry.toFixed(2)}</div>
-            </div>
-            <div className="bg-green-950/50 rounded-lg p-3 text-center">
-              <div className="text-xs text-green-600 mb-1 uppercase">Take Profit</div>
-              <div className="text-base font-mono font-bold text-green-400">{signal.takeProfit.toFixed(2)}</div>
-            </div>
-            <div className="bg-red-950/50 rounded-lg p-3 text-center">
-              <div className="text-xs text-red-600 mb-1 uppercase">Stop Loss</div>
-              <div className="text-base font-mono font-bold text-red-400">{signal.stopLoss.toFixed(2)}</div>
-            </div>
-          </div>
-
-          {/* R:R + Win rate row */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 flex items-center justify-between bg-[#0b0e1480] rounded-lg p-3">
-              <span className="text-xs text-gray-500">Risk:Reward</span>
-              <span className="font-mono font-bold text-yellow-400 text-sm">1 : {signal.riskReward.toFixed(2)}</span>
-            </div>
-            {signal.winRate !== undefined && (
-              <div className="flex-1 flex items-center justify-between bg-[#0b0e1480] rounded-lg p-3">
-                <span className="text-xs text-gray-500">Backtest</span>
-                <span className={`font-mono font-bold text-sm ${signal.winRate >= 60 ? 'text-green-400' : signal.winRate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                  {signal.winRate}% thắng
-                </span>
-              </div>
+            {aiCredentials && Object.values(aiCredentials).some((value) => value) && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(34,211,238,0.4)] bg-[rgba(34,211,238,0.12)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-cyan)]">
+                <Sparkles className="h-3 w-3" />
+                Multi AI
+              </span>
             )}
           </div>
 
-          {/* Indicators */}
-          <div className="grid grid-cols-2 gap-1.5 text-xs mb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              id="signal-scan-interval-select"
+              value={signalScanInterval}
+              onChange={(event) => setSignalScanInterval(Number(event.target.value))}
+              className="rounded-xl border border-[var(--border)] bg-[var(--bg-main)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] outline-none transition-all focus:border-[var(--color-brand)]"
+            >
+              <option value={0}>Auto scan: Off</option>
+              <option value={1}>Auto scan: 1m</option>
+              <option value={5}>Auto scan: 5m</option>
+              <option value={15}>Auto scan: 15m</option>
+              <option value={30}>Auto scan: 30m</option>
+            </select>
+
+            <button
+              id="signal-scan-button"
+              onClick={scanMarket}
+              disabled={scanning}
+              className="coinbase-pill-btn inline-flex items-center gap-2 bg-[rgba(139,92,246,0.16)] px-4 py-2 text-xs font-bold text-[#d8bcff] hover:bg-[rgba(139,92,246,0.24)] disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
+              Scan thị trường
+            </button>
+
+            <button
+              id="signal-analyze-button"
+              onClick={() => analyze(true)}
+              disabled={isAnalyzing || aiLoading}
+              className="coinbase-pill-btn inline-flex items-center gap-2 bg-[var(--color-brand)] px-5 py-2 text-xs font-extrabold uppercase tracking-[0.08em] text-white shadow-[0_12px_24px_rgba(0,82,255,0.35)] hover:bg-[var(--color-brand-hover)] disabled:opacity-60"
+            >
+              {isAnalyzing || aiLoading ? (
+                <>
+                  <Zap className="h-3.5 w-3.5 animate-pulse" />
+                  Đang phân tích
+                </>
+              ) : (
+                <>
+                  <Brain className="h-3.5 w-3.5" />
+                  Phân tích AI
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {signal ? (
+        <section className={`coinbase-surface rounded-2xl border p-4 ${typeBg(signal.type)}`}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5">
+                {typeIcon(signal.type)}
+                <span className={`text-2xl font-black tracking-tight ${typeText(signal.type)}`}>
+                  {signal.type}
+                </span>
+                <span className="rounded-full border border-[var(--border)] bg-[var(--bg-surface-soft)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                  {signal.strength}
+                </span>
+                {signal.winRate !== undefined && <WinRateBadge rate={signal.winRate} />}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {signal.aiProvider && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,82,255,0.42)] bg-[var(--color-brand-dim)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-soft)]">
+                    <Sparkles className="h-3 w-3" />
+                    {signal.aiProvider}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-surface-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <Activity className="h-3 w-3" />
+                  {selectedSymbol.replace('_USDT', '')}
+                </span>
+              </div>
+            </div>
+
+            <Gauge value={signal.confidence} />
+          </div>
+
+          {signal.aiAnalysis && (
+            <div className="mb-4 rounded-xl border border-[rgba(34,211,238,0.35)] bg-[rgba(34,211,238,0.08)] p-3.5">
+              <div className="mb-1.5 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--color-cyan)]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Nhận định AI
+              </div>
+              <p className="text-sm leading-relaxed text-[#cde9f6]">{signal.aiAnalysis}</p>
+            </div>
+          )}
+
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3 text-center">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Entry
+              </div>
+              <div className="font-mono text-lg font-bold text-[var(--text-main)]">
+                {signal.entry.toFixed(2)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[rgba(0,230,138,0.4)] bg-[var(--color-success-dim)] p-3 text-center">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-success)]">
+                Take Profit
+              </div>
+              <div className="font-mono text-lg font-bold text-[var(--color-success)]">
+                {signal.takeProfit.toFixed(2)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[rgba(255,77,106,0.4)] bg-[var(--color-danger-dim)] p-3 text-center">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-danger)]">
+                Stop Loss
+              </div>
+              <div className="font-mono text-lg font-bold text-[var(--color-danger)]">
+                {signal.stopLoss.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Risk : Reward
+              </div>
+              <div className="font-mono text-sm font-bold text-[var(--color-warning)]">
+                1 : {signal.riskReward.toFixed(2)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Backtest
+              </div>
+              <div
+                className={`font-mono text-sm font-bold ${
+                  signal.winRate === undefined
+                    ? 'text-[var(--text-muted)]'
+                    : signal.winRate >= 60
+                      ? 'text-[var(--color-success)]'
+                      : signal.winRate >= 50
+                        ? 'text-[var(--color-warning)]'
+                        : 'text-[var(--color-danger)]'
+                }`}
+              >
+                {signal.winRate === undefined ? '—' : `${signal.winRate}% thắng`}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2">
             {[
               {
                 label: 'RSI (14)',
                 value: signal.indicators.rsi.toFixed(1),
-                note: signal.indicators.rsi < 30 ? '(Quá bán)' : signal.indicators.rsi > 70 ? '(Quá mua)' : '(Trung lập)',
-                color: signal.indicators.rsi < 30 ? 'text-green-400' : signal.indicators.rsi > 70 ? 'text-red-400' : 'text-yellow-400',
+                note:
+                  signal.indicators.rsi < 30
+                    ? '(Quá bán)'
+                    : signal.indicators.rsi > 70
+                      ? '(Quá mua)'
+                      : '(Trung lập)',
+                color:
+                  signal.indicators.rsi < 30
+                    ? 'text-[var(--color-success)]'
+                    : signal.indicators.rsi > 70
+                      ? 'text-[var(--color-danger)]'
+                      : 'text-[var(--color-warning)]',
               },
               {
-                label: 'MACD Hist.',
+                label: 'MACD Histogram',
                 value: signal.indicators.macd.histogram.toFixed(4),
-                color: signal.indicators.macd.histogram > 0 ? 'text-green-400' : 'text-red-400',
+                color:
+                  signal.indicators.macd.histogram > 0
+                    ? 'text-[var(--color-success)]'
+                    : 'text-[var(--color-danger)]',
               },
               {
                 label: 'Volume vs Avg',
                 value: `${((signal.indicators.volume / signal.indicators.volumeAvg) * 100).toFixed(0)}%`,
-                color: signal.indicators.volume > signal.indicators.volumeAvg * 1.2 ? 'text-green-400' : 'text-gray-400',
+                color:
+                  signal.indicators.volume > signal.indicators.volumeAvg * 1.2
+                    ? 'text-[var(--color-success)]'
+                    : 'text-[var(--text-secondary)]',
               },
               {
                 label: 'ATR (14)',
                 value: signal.indicators.atr.toFixed(2),
-                color: 'text-gray-300',
+                color: 'text-[var(--text-secondary)]',
               },
             ].map(({ label, value, note, color }) => (
-              <div key={label} className="bg-[#0b0e1480] rounded-lg p-3">
-                <div className="text-gray-600 text-xs mb-1">{label}</div>
-                <div className={`font-mono font-bold text-sm ${color}`}>
-                  {value}{note && <span className="text-[10px] text-gray-600 ml-1.5">{note}</span>}
+              <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  {label}
+                </div>
+                <div className={`font-mono text-sm font-bold ${color}`}>
+                  {value}
+                  {note && <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">{note}</span>}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Reasons */}
-          <div className="mb-4">
-            <div className="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wider flex items-center gap-1.5">
-              <BarChart2 className="w-4 h-4" /> Lý do phân tích
+          <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3.5">
+            <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              <BarChart2 className="h-3.5 w-3.5" />
+              Lý do phân tích
             </div>
             <div className="space-y-1.5">
-              {signal.reasons.map((r, i) => (
-                <div key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                  <span className="shrink-0 mt-0.5 text-xs text-gray-600">›</span>
-                  <span>{r}</span>
+              {signal.reasons.map((reason, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                  <span className="mt-1 text-[var(--text-muted)]">•</span>
+                  <span>{reason}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Place Order Button */}
           {onPlaceOrder && signal.type !== 'NEUTRAL' && (
             <button
+              id="signal-place-order-button"
               onClick={() => onPlaceOrder(signal)}
-              className={`w-full py-3 rounded-lg font-bold text-base transition-all shadow-lg ${
+              className={`coinbase-pill-btn w-full py-3 text-sm font-extrabold uppercase tracking-[0.08em] text-white shadow-[0_14px_28px_rgba(0,0,0,0.35)] ${
                 signal.type === 'LONG'
-                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white hover:from-green-500 hover:to-green-400'
-                  : 'bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-500 hover:to-red-400'
-              }`}>
-              📋 Đặt lệnh {signal.type} theo tín hiệu này
+                  ? 'bg-[var(--color-success)] hover:brightness-105'
+                  : 'bg-[var(--color-danger)] hover:brightness-110'
+              }`}
+            >
+              Đặt lệnh {signal.type} theo tín hiệu
             </button>
           )}
 
-          <div className="text-[9px] text-gray-700 text-center mt-2">
-            ⚠️ Chỉ là gợi ý — luôn tự chịu trách nhiệm khi giao dịch
-          </div>
-        </div>
+          <p className="mt-2 text-center text-[10px] font-medium text-[var(--text-muted)]">
+            ⚠️ Chỉ là gợi ý, luôn quản lý rủi ro khi giao dịch.
+          </p>
+        </section>
       ) : (
-        <div className="flex flex-col items-center justify-center gap-4 py-10 bg-[#1a2235]/60 rounded-xl border border-[#2a3045]">
-          <div className="w-12 h-12 rounded-xl bg-[#f0b90b]/10 flex items-center justify-center">
-            <Brain className="w-6 h-6 text-[#f0b90b]/70" />
+        <section className="coinbase-surface rounded-2xl border border-[var(--border)] p-8 text-center">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-[rgba(0,82,255,0.3)] bg-[var(--color-brand-dim)]">
+            <Brain className="h-7 w-7 text-[var(--color-brand)]" />
           </div>
-          <div className="text-center">
-            <p className="text-gray-400 text-sm mb-1">Nhấn <strong className="text-[#f0b90b]">Phân tích AI</strong> để bắt đầu</p>
-            <p className="text-gray-600 text-xs">{selectedSymbol} — Phân tích kỹ thuật + AI tích hợp</p>
-          </div>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Nhấn <span className="font-bold text-[var(--accent-soft)]">Phân tích AI</span> để bắt đầu cho {selectedSymbol.replace('_', '/')}
+          </p>
           {!aiCredentials && (
-            <p className="text-[10px] text-blue-400 text-center">
-              💡 Thêm AI API key để có nhận định thông minh hơn
-            </p>
+            <p className="mt-2 text-xs text-[var(--color-cyan)]">💡 Thêm API key AI để tăng chất lượng nhận định</p>
           )}
-        </div>
+        </section>
       )}
 
-      {/* Multi-symbol scan results */}
       {Object.keys(scanResults).length > 0 && (
-        <div>
-          <div className="text-xs text-gray-500 font-semibold mb-2 flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-green-500" />
-            KẾT QUẢ SCAN THỊ TRƯỜNG
+        <section className="coinbase-surface rounded-2xl p-4">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <CheckCircle className="h-3.5 w-3.5 text-[var(--color-success)]" />
+            Kết quả scan thị trường
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {Object.entries(scanResults).map(([sym, sig]) => (
-              <div key={sym} className={`rounded-lg p-2.5 border cursor-pointer hover:opacity-80 transition-opacity ${typeBg(sig.type)}`}
-                onClick={() => setSelectedSymbol(sym)}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-white">{sym.replace('_USDT', '')}</span>
-                  <span className={`text-[10px] font-bold ${typeText(sig.type)}`}>{sig.type}</span>
-                </div>
-                <div className="flex justify-between text-[10px] text-gray-500">
-                  <span>{sig.strength}</span>
-                  <span className="flex items-center gap-1">
-                    <Target className="w-2.5 h-2.5" />{sig.winRate ?? '—'}%
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {Object.entries(scanResults).map(([symbol, scannedSignal]) => (
+              <button
+                id={`signal-scan-result-${symbol}`}
+                key={symbol}
+                onClick={() => setSelectedSymbol(symbol)}
+                className={`w-full rounded-xl border p-3 text-left transition-all hover:-translate-y-[1px] ${typeBg(scannedSignal.type)}`}
+              >
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-sm font-bold text-[var(--text-main)]">{symbol.replace('_USDT', '')}</span>
+                  <span className={`text-xs font-black uppercase tracking-[0.08em] ${typeText(scannedSignal.type)}`}>
+                    {scannedSignal.type}
                   </span>
-                  <span>{sig.confidence}% conf</span>
                 </div>
-              </div>
+                <div className="flex flex-wrap gap-2 text-[11px] text-[var(--text-secondary)]">
+                  <span>{scannedSignal.strength}</span>
+                  <span>•</span>
+                  <span>{scannedSignal.confidence}% conf</span>
+                  <span>•</span>
+                  <span>WR {scannedSignal.winRate ?? '—'}%</span>
+                </div>
+              </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Disclaimer */}
-      <div className="mt-auto flex items-start gap-2 p-2.5 bg-yellow-950/30 border border-yellow-900/40 rounded-lg text-[10px] text-yellow-600">
-        <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-        <span>Phân tích AI dựa trên chỉ báo kỹ thuật + mô hình ngôn ngữ. Không phải lời khuyên tài chính. Luôn quản lý rủi ro.</span>
-      </div>
+      <section className="rounded-xl border border-[rgba(255,184,46,0.3)] bg-[var(--color-warning-dim)] p-3">
+        <div className="flex items-start gap-2 text-xs leading-relaxed text-[#ffd77a]">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Phân tích AI dựa trên chỉ báo kỹ thuật và mô hình ngôn ngữ. Không phải lời khuyên tài chính.
+          </span>
+        </div>
+      </section>
     </div>
   );
 }

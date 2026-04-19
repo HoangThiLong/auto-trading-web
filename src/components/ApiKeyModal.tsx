@@ -62,7 +62,7 @@ export default function ApiKeyModal() {
         toast('⚠️ API key đã lưu — dữ liệu thị trường hoạt động bình thường', { duration: 5000 });
       }
     } catch {
-      setCredentials({ apiKey, secretKey });
+      setCredentials({ apiKey, secretKey, mexcNetwork: network });
       toast.error('Không thể kết nối MEXC. Kiểm tra lại API key.');
     } finally {
       setTesting(false);
@@ -84,14 +84,14 @@ export default function ApiKeyModal() {
   const hasAnyAiKey = Object.values(aiKeys).some(v => v.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={() => setApiModalOpen(false)} />
+      <div className="modal-backdrop absolute inset-0" onClick={() => setApiModalOpen(false)} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-panel)] shadow-[0_35px_90px_rgba(2,6,23,0.85)]">
+      <div className="premium-modal-shell relative w-full max-w-3xl overflow-hidden rounded-[28px]">
         {/* Header */}
-        <div className="flex items-center gap-4 border-b border-[var(--border-soft)] bg-gradient-to-r from-[rgba(15,21,32,0.95)] to-[rgba(22,27,39,0.92)] px-6 py-5">
+        <div className="relative z-10 flex items-center gap-4 border-b border-[var(--border-soft)] bg-gradient-to-r from-[rgba(12,18,36,0.98)] via-[rgba(17,24,44,0.96)] to-[rgba(12,18,36,0.98)] px-6 py-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(0,82,255,0.14)]">
             <Key className="h-5 w-5 text-[var(--color-brand-hover)]" />
           </div>
@@ -109,7 +109,7 @@ export default function ApiKeyModal() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-[var(--border-soft)]">
+        <div className="relative z-10 flex border-b border-[var(--border-soft)] bg-[rgba(255,255,255,0.01)]">
           {([
             { id: 'mexc', icon: Wifi, label: 'MEXC API' },
             { id: 'ai', icon: Brain, label: 'AI Models' },
@@ -118,10 +118,8 @@ export default function ApiKeyModal() {
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all ${
-                tab === id
-                  ? 'border-b-2 border-[var(--color-brand)] bg-[rgba(0,82,255,0.1)] text-[#b7ceff]'
-                  : 'text-[var(--text-muted)] hover:text-[#d9e7ff]'
+              className={`premium-tab-btn flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold ${
+                tab === id ? 'premium-tab-btn-active' : ''
               }`}
             >
               <Icon className="h-4 w-4" /> {label}
@@ -129,7 +127,7 @@ export default function ApiKeyModal() {
           ))}
         </div>
 
-        <div className="max-h-[74vh] space-y-4 overflow-y-auto p-6">
+        <div className="relative z-10 max-h-[74vh] space-y-4 overflow-y-auto p-6">
           {/* ── MEXC Tab ── */}
           {tab === 'mexc' && (
             <>
@@ -153,7 +151,7 @@ export default function ApiKeyModal() {
               </div>
 
               {/* Network Selector */}
-              <div className="coinbase-surface-soft rounded-2xl p-5">
+              <div className="premium-section-card rounded-2xl p-5">
                 <label className="mb-3 block text-xs uppercase tracking-wider text-[var(--text-muted)]">Môi trường</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -187,7 +185,7 @@ export default function ApiKeyModal() {
               </div>
 
               {/* Inputs */}
-              <div className="coinbase-surface-soft rounded-2xl p-5">
+              <div className="premium-section-card rounded-2xl p-5">
                 <div className="space-y-4">
                   <div>
                     <label className="mb-2 block text-xs uppercase tracking-wider text-[var(--text-muted)]">API KEY</label>
@@ -263,7 +261,7 @@ export default function ApiKeyModal() {
               </div>
 
               {/* Guide */}
-              <div className="coinbase-surface-soft rounded-2xl p-5">
+              <div className="premium-section-card rounded-2xl p-5">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#cfdcf8]">
                   <Shield className="h-4 w-4 text-[var(--color-brand-hover)]" /> Hướng dẫn tạo API Key
                 </div>
@@ -298,7 +296,7 @@ export default function ApiKeyModal() {
               </div>
 
               {/* Priority selector */}
-              <div className="coinbase-surface-soft rounded-2xl p-5">
+              <div className="premium-section-card rounded-2xl p-5">
                 <label className="mb-3 block text-xs uppercase tracking-wider text-[var(--text-muted)]">AI Ưu tiên</label>
                 <div className="grid grid-cols-2 gap-2.5">
                   {AI_PROVIDERS.map(p => (
@@ -322,7 +320,7 @@ export default function ApiKeyModal() {
               {/* AI Keys */}
               <div className="space-y-4">
                 {AI_PROVIDERS.map(provider => (
-                  <div key={provider.id} className="coinbase-surface-soft rounded-2xl p-5">
+                  <div key={provider.id} className="premium-section-card rounded-2xl p-5">
                     <div className="mb-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-2.5 w-2.5 rounded-full" style={{ background: provider.color }} />
@@ -362,7 +360,7 @@ export default function ApiKeyModal() {
                 ))}
 
                 {/* CryptoPanic */}
-                <div className="coinbase-surface-soft rounded-2xl p-5">
+                <div className="premium-section-card rounded-2xl p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="h-2.5 w-2.5 rounded-full bg-orange-500" />
@@ -405,7 +403,7 @@ export default function ApiKeyModal() {
           {/* ── Security Tab ── */}
           {tab === 'security' && (
             <div className="space-y-5">
-              <div className="coinbase-surface-soft space-y-4 rounded-2xl p-6 text-base">
+              <div className="premium-section-card space-y-4 rounded-2xl p-6 text-base">
                 {[
                   { icon: '🔒', title: 'Lưu trữ cục bộ', desc: 'Tất cả API keys được mã hóa và lưu trong localStorage của trình duyệt. Keys KHÔNG gửi về bất kỳ server nào.' },
                   { icon: '🛡️', title: 'KHÔNG bật Withdraw', desc: 'Khi tạo API key trên MEXC, tuyệt đối không bật quyền rút tiền (Withdraw) để bảo vệ tài sản.' },

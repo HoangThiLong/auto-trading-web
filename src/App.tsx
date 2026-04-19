@@ -315,22 +315,23 @@ export default function App() {
   const hasAiKey = aiCredentials && Object.values(aiCredentials).some(v => typeof v === 'string' && v.length > 0);
 
   const sentimentIcon =
-    marketSentiment === 'BULLISH'  ? <TrendingUp  className="w-3 h-3 text-emerald-400" /> :
-    marketSentiment === 'FEARFUL'  ? <TrendingDown className="w-3 h-3 text-rose-400" /> :
-    marketSentiment === 'BEARISH'  ? <TrendingDown className="w-3 h-3 text-amber-400" /> :
-    <Minus className="w-3 h-3 text-slate-500" />;
+    marketSentiment === 'BULLISH'  ? <TrendingUp  className="w-3.5 h-3.5 text-[var(--color-success)]" /> :
+    marketSentiment === 'FEARFUL'  ? <TrendingDown className="w-3.5 h-3.5 text-[var(--color-danger)]" /> :
+    marketSentiment === 'BEARISH'  ? <TrendingDown className="w-3.5 h-3.5 text-[var(--color-warning)]" /> :
+    <Minus className="w-3.5 h-3.5 text-[var(--text-dim)]" />;
 
 
   return (
     <div className="coinbase-shell flex h-screen flex-col overflow-hidden text-[var(--text-main)] select-none">
       <Toaster position="top-right" toastOptions={{
         style: {
-          background: '#141926',
-          color: '#f5f7ff',
-          border: '1px solid rgba(91,97,110,0.34)',
+          background: 'var(--bg-card)',
+          color: 'var(--text-main)',
+          border: '1px solid var(--border)',
           fontSize: '13px',
           borderRadius: '16px',
-          boxShadow: '0 12px 28px rgba(0,0,0,0.35)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          fontFamily: 'Sora, sans-serif',
         },
       }} />
 
@@ -339,46 +340,52 @@ export default function App() {
       <AutoTradePanel />
 
       {/* ── Header ── */}
-      <header className="z-40 flex h-16 shrink-0 items-center gap-3 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-[rgba(91,97,110,0.25)] bg-[#0d1119]/92 px-4 backdrop-blur-xl">
+      <header className="z-40 flex h-[72px] shrink-0 items-center gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-[var(--border)] bg-[var(--bg-surface-glass)] px-5 backdrop-blur-2xl">
         {/* Logo */}
-        <div className="mr-3 flex shrink-0 items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0052ff] to-[#578bfa] shadow-[0_10px_24px_rgba(0,82,255,0.35)]">
-            <span className="text-sm font-black text-white">M</span>
+        <div className="mr-4 flex shrink-0 items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0052ff] to-[#22d3ee] shadow-[0_8px_24px_rgba(0,82,255,0.3)] animate-breathe">
+            <span className="text-sm font-extrabold text-white tracking-tight">M</span>
           </div>
           <div>
-            <div className="text-[15px] font-semibold leading-none tracking-tight text-[#f5f7ff]">MEXC <span className="text-[#6da0ff]">Pro</span></div>
-            <div className="mt-1 text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-[#96a2be]">Futures Terminal v2</div>
+            <div className="text-[15px] font-bold leading-none tracking-tight">
+              <span className="text-[var(--text-main)]">MEXC</span>{' '}
+              <span className="text-gradient-brand font-extrabold">PRO</span>
+            </div>
+            <div className="mt-1 text-[10px] font-semibold uppercase leading-none tracking-[0.16em] text-[var(--text-muted)]">Futures Terminal v2</div>
           </div>
         </div>
 
-        {/* Dang xem badge */}
-        <div className="hidden md:flex items-center gap-2 rounded-2xl border border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.04)] px-3.5 py-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] shrink-0">
-          <span className="text-[#96a2be]">Đang xem:</span>
-          <span className="font-semibold text-[#f5f7ff] tracking-tight">{selectedSymbol.replace('_', '/')}</span>
+        {/* Viewing badge */}
+        <div className="hidden md:flex items-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface-soft)] px-4 py-2.5 text-sm shrink-0">
+          <span className="text-[var(--text-muted)] text-xs">Viewing</span>
+          <span className="font-bold text-[var(--text-main)] tracking-tight">{selectedSymbol.replace('_', '/')}</span>
           {currentSignal && currentSignal.type !== 'NEUTRAL' && (
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
-              currentSignal.type === 'LONG' ? 'border-[rgba(14,203,129,0.45)] bg-[rgba(14,203,129,0.12)] text-[#8ef3c4]' : 'border-[rgba(246,70,93,0.45)] bg-[rgba(246,70,93,0.12)] text-[#ff9fb0]'
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold tracking-wide ${
+              currentSignal.type === 'LONG' ? 'border-[rgba(0,230,138,0.4)] bg-[var(--color-success-dim)] text-[var(--color-success)]' : 'border-[rgba(255,77,106,0.4)] bg-[var(--color-danger-dim)] text-[var(--color-danger)]'
             }`}>{currentSignal.type}</span>
           )}
         </div>
 
         {/* Sentiment pill */}
-        <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.04)] px-3.5 py-2 text-sm shrink-0">
+        <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface-soft)] px-4 py-2.5 text-sm shrink-0">
           <div className="scale-110">{sentimentIcon}</div>
-          <span className="font-medium text-[#c6d3eb]">{marketSentiment}</span>
+          <span className="font-semibold text-[var(--text-secondary)]">{marketSentiment}</span>
         </div>
 
         {/* Desktop Nav */}
-        <nav className="ml-6 hidden shrink-0 items-center gap-2.5 md:flex">
+        <nav className="ml-8 hidden shrink-0 items-center gap-1.5 md:flex">
           {navItems.map(({ id, icon: Icon, label }) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              className={`coinbase-pill-btn flex items-center gap-2 px-3.5 py-2 text-sm font-semibold tracking-[0.01em] ${
+              className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-semibold tracking-[0.01em] rounded-xl transition-all ${
                 activeTab === id
-                  ? 'border-[rgba(0,82,255,0.5)] bg-[rgba(0,82,255,0.16)] text-[#e6efff] shadow-[inset_0_0_0_1px_rgba(0,82,255,0.22)]'
-                  : 'border-[rgba(91,97,110,0.24)] text-[#b2bfd8] hover:border-[rgba(87,139,250,0.45)] hover:bg-[rgba(87,139,250,0.12)] hover:text-[#f0f5ff]'
+                  ? 'bg-[var(--color-brand-dim)] text-[var(--text-main)] shadow-[0_0_20px_rgba(0,82,255,0.1)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--text-secondary)]'
               }`}>
-              <Icon className="w-5 h-5" />
+              <Icon className="w-4.5 h-4.5" />
               {label}
+              {activeTab === id && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-[var(--color-brand)]" />
+              )}
             </button>
           ))}
         </nav>
@@ -387,26 +394,26 @@ export default function App() {
         <div className="ml-auto flex shrink-0 items-center gap-2.5 pl-3">
           {/* API Status button */}
           <button onClick={() => setApiModalOpen(true)}
-            className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-3.5 py-2 font-semibold tracking-[0.01em] ${
+            className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-4 py-2.5 font-semibold ${
               isApiConnected
-                ? 'bg-[rgba(14,203,129,0.12)] border-[rgba(14,203,129,0.42)] text-[#81f0bd]'
+                ? 'bg-[var(--color-success-dim)] border-[rgba(0,230,138,0.35)] text-[var(--color-success)]'
                 : credentials
-                ? 'bg-[rgba(240,185,11,0.12)] border-[rgba(240,185,11,0.4)] text-[#ffd76b]'
-                : 'bg-[rgba(247,247,247,0.03)] border-[rgba(91,97,110,0.3)] text-[#c7d2ea] hover:bg-[rgba(87,139,250,0.12)] hover:border-[rgba(87,139,250,0.45)]'
+                ? 'bg-[var(--color-warning-dim)] border-[rgba(255,184,46,0.35)] text-[var(--color-warning)]'
+                : 'bg-[var(--bg-surface-soft)] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--color-brand-hover)] hover:text-[var(--text-secondary)]'
             }`}>
             <Key className="w-4 h-4" />
             {isApiConnected ? 'Connected' : credentials ? 'API Saved' : 'API Keys'}
-            {hasAiKey && <span className="w-2 h-2 rounded-full bg-sky-400" />}
+            {hasAiKey && <span className="w-2 h-2 rounded-full bg-[var(--color-cyan)] animate-glow" />}
           </button>
 
           {/* Auto-trade button */}
           <button onClick={() => setAutoTradePanelOpen(true)}
-            className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-3.5 py-2 font-semibold tracking-[0.01em] ${
+            className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-4 py-2.5 font-semibold ${
               autoTradeBadge
                 ? autoTradeMode === 'live'
-                  ? 'bg-[rgba(246,70,93,0.14)] border-[rgba(246,70,93,0.45)] text-[#ff9cab]'
-                  : 'bg-[rgba(240,185,11,0.13)] border-[rgba(240,185,11,0.42)] text-[#ffd46a]'
-                : 'border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.03)] text-[#c7d2ea] hover:bg-[rgba(87,139,250,0.12)] hover:border-[rgba(87,139,250,0.45)]'
+                  ? 'bg-[var(--color-danger-dim)] border-[rgba(255,77,106,0.35)] text-[var(--color-danger)]'
+                  : 'bg-[var(--color-warning-dim)] border-[rgba(255,184,46,0.35)] text-[var(--color-warning)]'
+                : 'bg-[var(--bg-surface-soft)] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--color-brand-hover)] hover:text-[var(--text-secondary)]'
             }`}>
             <Bot className="w-4 h-4" />
             <span className={autoTradeMode !== 'off' ? undefined : 'hidden lg:inline'}>
@@ -416,17 +423,17 @@ export default function App() {
           </button>
 
           {/* Connection */}
-          <div className={`hidden lg:flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium ${
+          <div className={`hidden lg:flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium ${
             credentials
-              ? isApiConnected ? 'border-[rgba(14,203,129,0.4)] text-[#82efbe] bg-[rgba(14,203,129,0.1)]' : 'border-[rgba(240,185,11,0.4)] text-[#ffd673] bg-[rgba(240,185,11,0.1)]'
-              : 'border-[rgba(91,97,110,0.3)] text-[#96a2be] bg-[rgba(247,247,247,0.03)]'
+              ? isApiConnected ? 'border-[rgba(0,230,138,0.3)] text-[var(--color-success)] bg-[var(--color-success-dim)]' : 'border-[rgba(255,184,46,0.3)] text-[var(--color-warning)] bg-[var(--color-warning-dim)]'
+              : 'border-[var(--border)] text-[var(--text-muted)] bg-[var(--bg-surface-soft)]'
           }`}>
             {credentials ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             {credentials ? (isApiConnected ? 'API Connected' : 'API Status') : 'No API Key'}
           </div>
 
           {/* Mobile menu */}
-          <button className="p-1.5 text-[#9aa7c2] transition-colors hover:text-[#f5f7ff] md:hidden" onClick={() => setMobileMenuOpen(v => !v)}>
+          <button className="p-2 text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)] md:hidden rounded-xl hover:bg-[var(--bg-surface-soft)]" onClick={() => setMobileMenuOpen(v => !v)}>
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -434,17 +441,17 @@ export default function App() {
 
       {/* Mobile nav */}
       {mobileMenuOpen && (
-        <div className="md:hidden flex shrink-0 gap-1.5 overflow-x-auto border-b border-[rgba(91,97,110,0.24)] bg-[#101521]/95 px-2.5 py-2 backdrop-blur-xl">
+        <div className="md:hidden flex shrink-0 gap-1.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg-surface-glass)] px-3 py-2.5 backdrop-blur-2xl">
           {navItems.map(({ id, icon: Icon, label }) => (
             <button key={id} onClick={() => { setActiveTab(id); setMobileMenuOpen(false); }}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
-                activeTab === id ? 'border-[rgba(0,82,255,0.48)] bg-[rgba(0,82,255,0.16)] text-[#e7efff]' : 'border-[rgba(91,97,110,0.28)] text-[#aebbd6] hover:border-[rgba(87,139,250,0.45)] hover:bg-[rgba(87,139,250,0.1)]'
+              className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs whitespace-nowrap transition-all ${
+                activeTab === id ? 'border-[rgba(0,82,255,0.4)] bg-[var(--color-brand-dim)] text-[var(--text-main)]' : 'border-[var(--border-soft)] text-[var(--text-muted)] hover:border-[var(--color-brand-hover)] hover:bg-[var(--bg-surface-soft)]'
               }`}>
-              <Icon className="w-3 h-3" />{label}
+              <Icon className="w-3.5 h-3.5" />{label}
             </button>
           ))}
           <button onClick={() => setApiModalOpen(true)}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(91,97,110,0.3)] bg-[rgba(247,247,247,0.04)] px-3 py-1.5 text-xs text-[#d5def2] hover:border-[rgba(87,139,250,0.45)] hover:bg-[rgba(87,139,250,0.12)]">
+            className="flex shrink-0 items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface-soft)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:border-[var(--color-brand-hover)]">
             <Key className="w-3 h-3" /> API
           </button>
         </div>
@@ -456,7 +463,7 @@ export default function App() {
         {/* LEFT: Coin sidebar */}
         <div
           style={sidebarOpen ? { width: `${sidebarWidth}px`, minWidth: '250px' } : { width: 0 }}
-          className={`coinbase-surface shrink-0 border-r border-[rgba(91,97,110,0.2)] transition-[width] duration-200 overflow-hidden ${sidebarOpen ? '' : 'w-0'}`}
+          className={`shrink-0 border-r border-[var(--border-soft)] transition-[width] duration-200 overflow-hidden ${sidebarOpen ? '' : 'w-0'}`}
         >
           <CoinList />
         </div>
@@ -464,15 +471,15 @@ export default function App() {
         {sidebarOpen && (
           <div
             onMouseDown={() => setDragging('sidebar-width')}
-            className="w-1.5 shrink-0 cursor-col-resize bg-[#0f141e] transition-colors hover:bg-[rgba(87,139,250,0.45)]"
+            className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-main)] transition-colors hover:bg-[var(--color-brand)] hover:shadow-[0_0_8px_var(--accent-glow)]"
             title="Kéo để đổi kích thước Coin List"
           />
         )}
 
         {/* Toggle */}
         <button onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="flex w-4 shrink-0 items-center justify-center border-r border-[rgba(91,97,110,0.25)] bg-[#0d121b]/85 transition-colors hover:bg-[rgba(87,139,250,0.16)]">
-          {sidebarOpen ? <ChevronLeft className="w-3 h-3 text-slate-500" /> : <ChevronRight className="w-3 h-3 text-slate-500" />}
+          className="flex w-4 shrink-0 items-center justify-center border-r border-[var(--border-soft)] bg-[var(--bg-panel)] transition-colors hover:bg-[var(--color-brand-dim)]">
+          {sidebarOpen ? <ChevronLeft className="w-3 h-3 text-[var(--text-dim)]" /> : <ChevronRight className="w-3 h-3 text-[var(--text-dim)]" />}
         </button>
 
         {/* CENTER + RIGHT */}
@@ -480,12 +487,12 @@ export default function App() {
 
           {/* ── CHART tab ── */}
           {activeTab === 'chart' && (
-            <div className="flex flex-1 min-h-0 flex-col overflow-hidden gap-2.5 p-3">
-              <div className="coinbase-surface-soft shrink-0 overflow-hidden rounded-2xl">
+            <div className="flex flex-1 min-h-0 flex-col overflow-hidden gap-2 p-2.5">
+              <div className="shrink-0 overflow-hidden rounded-2xl glass-card">
                 <TickerBar />
               </div>
 
-              <div className="coinbase-surface flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+              <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
                 <div className="flex-1 min-h-0 overflow-hidden">
                   <div ref={chartMainSplitRef} className="flex h-full min-h-0 overflow-hidden">
                     {/* Chart area */}
@@ -496,7 +503,7 @@ export default function App() {
                     {/* Resize handle: chart vs right panel */}
                     <div
                       onMouseDown={() => setDragging('chart-right-width')}
-                      className="w-1.5 shrink-0 cursor-col-resize bg-[#101722] transition-colors hover:bg-[rgba(87,139,250,0.45)]"
+                      className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-main)] transition-colors hover:bg-[var(--color-brand)] hover:shadow-[0_0_8px_var(--accent-glow)]"
                       title="Kéo để đổi kích thước panel"
                     />
 
@@ -504,22 +511,22 @@ export default function App() {
                     <div
                       ref={chartRightPanelRef}
                       style={{ width: `${chartRightWidth}px` }}
-                      className="shrink-0 border-l border-[rgba(91,97,110,0.25)] flex flex-col min-w-0 bg-[rgba(247,247,247,0.03)]"
+                      className="shrink-0 border-l border-[var(--border-soft)] flex flex-col min-w-0 bg-[var(--bg-panel)]"
                     >
                       {/* Order Book — top */}
-                      <div className="flex-1 min-h-[180px] overflow-hidden border-b border-[rgba(91,97,110,0.25)]">
+                      <div className="flex-1 min-h-[180px] overflow-hidden border-b border-[var(--border-soft)]">
                         <OrderBook />
                       </div>
 
                       {/* Resize handle: orderbook vs order form */}
                       <div
                         onMouseDown={() => setDragging('chart-right-height')}
-                        className="h-1.5 shrink-0 cursor-row-resize bg-[#101722] transition-colors hover:bg-[rgba(87,139,250,0.45)]"
+                        className="h-1 shrink-0 cursor-row-resize bg-[var(--bg-main)] transition-colors hover:bg-[var(--color-brand)] hover:shadow-[0_0_8px_var(--accent-glow)]"
                         title="Kéo để đổi chiều cao Order Form"
                       />
 
                       {/* Order Form — bottom */}
-                      <div style={{ height: `${chartSignalHeight}px` }} className="shrink-0 overflow-hidden border-t border-[rgba(91,97,110,0.24)]">
+                      <div style={{ height: `${chartSignalHeight}px` }} className="shrink-0 overflow-hidden border-t border-[var(--border-soft)]">
                         <div className="h-full overflow-y-auto">
                           <OrderPanel prefillSignal={prefillSignal} />
                         </div>
@@ -528,7 +535,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="h-[30%] min-h-[220px] overflow-y-auto border-t border-[rgba(91,97,110,0.24)] bg-[rgba(247,247,247,0.02)]">
+                <div className="h-[30%] min-h-[220px] overflow-y-auto border-t border-[var(--border-soft)] bg-[var(--bg-panel)]">
                   <PendingOrdersPanel />
                 </div>
               </div>
@@ -538,15 +545,15 @@ export default function App() {
           {/* ── SIGNALS tab ── */}
           {activeTab === 'signals' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="coinbase-surface-soft px-4 py-2.5 flex items-center gap-2.5 shrink-0 border-b border-[rgba(91,97,110,0.24)]">
-                <Brain className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">AI Signal Engine</span>
+              <div className="glass-card px-5 py-3 flex items-center gap-3 shrink-0 border-b border-[var(--border)]">
+                <Brain className="w-5 h-5 text-[var(--color-brand)]" />
+                <span className="text-sm font-bold tracking-tight">AI Signal Engine</span>
               </div>
               <div className="flex-1 overflow-hidden flex">
                 <div className="w-full max-w-xl overflow-y-auto">
                   <SignalPanel candles={candles} onPlaceOrder={handlePlaceOrder} />
                 </div>
-                <div className="flex-1 border-l border-[rgba(91,97,110,0.24)] min-w-0">
+                <div className="flex-1 border-l border-[var(--border-soft)] min-w-0">
                   <TradingChart onCandlesReady={setCandles} />
                 </div>
               </div>
@@ -555,13 +562,13 @@ export default function App() {
 
           {/* ── ORDERS tab ── */}
           {activeTab === 'orders' && (
-            <div className="flex-1 flex flex-col overflow-hidden p-3.5">
-              <div className="coinbase-surface-soft mb-3.5 px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shrink-0">
-                <ShoppingBag className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">Lệnh đang hoạt động</span>
+            <div className="flex-1 flex flex-col overflow-hidden p-3">
+              <div className="glass-card mb-3 px-5 py-3 rounded-2xl flex items-center gap-3 shrink-0">
+                <ShoppingBag className="w-5 h-5 text-[var(--color-brand)]" />
+                <span className="text-sm font-bold tracking-tight">Lệnh đang hoạt động</span>
               </div>
 
-              <div className="coinbase-surface flex-1 min-h-0 overflow-hidden rounded-2xl">
+              <div className="glass-panel flex-1 min-h-0 overflow-hidden rounded-2xl">
                 <PendingOrdersPanel />
               </div>
             </div>
@@ -570,12 +577,12 @@ export default function App() {
           {/* ── ACCOUNT tab ── */}
           {activeTab === 'account' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="coinbase-surface-soft px-4 py-2.5 flex items-center gap-2.5 shrink-0 border-b border-[rgba(91,97,110,0.24)]">
-                <Wallet className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">Tài khoản</span>
+              <div className="glass-card px-5 py-3 flex items-center gap-3 shrink-0 border-b border-[var(--border)]">
+                <Wallet className="w-5 h-5 text-[var(--color-brand)]" />
+                <span className="text-sm font-bold tracking-tight">Tài khoản</span>
               </div>
               <div className="flex-1 overflow-y-auto max-w-3xl mx-auto w-full p-3">
-                <div className="coinbase-surface rounded-2xl overflow-hidden">
+                <div className="glass-panel rounded-2xl overflow-hidden">
                   <AccountPanel />
                 </div>
               </div>
@@ -585,12 +592,12 @@ export default function App() {
           {/* ── NEWS tab ── */}
           {activeTab === 'news' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="coinbase-surface-soft px-4 py-2.5 flex items-center gap-2.5 shrink-0 border-b border-[rgba(91,97,110,0.24)]">
-                <Newspaper className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-semibold tracking-tight text-[#f5f7ff]">Tin tức & Sentiment</span>
+              <div className="glass-card px-5 py-3 flex items-center gap-3 shrink-0 border-b border-[var(--border)]">
+                <Newspaper className="w-5 h-5 text-[var(--color-brand)]" />
+                <span className="text-sm font-bold tracking-tight">Tin tức & Sentiment</span>
               </div>
               <div className="flex-1 overflow-hidden max-w-3xl mx-auto w-full p-3">
-                <div className="coinbase-surface h-full rounded-2xl overflow-hidden">
+                <div className="glass-panel h-full rounded-2xl overflow-hidden">
                   <NewsFeed />
                 </div>
               </div>
@@ -600,7 +607,7 @@ export default function App() {
           {/* ── SETTINGS tab ── */}
           {activeTab === 'settings' && (
             <div className="flex-1 overflow-y-auto p-3">
-              <div className="coinbase-surface rounded-2xl overflow-hidden">
+              <div className="glass-panel rounded-2xl overflow-hidden">
                 <SettingsPanel />
               </div>
             </div>
