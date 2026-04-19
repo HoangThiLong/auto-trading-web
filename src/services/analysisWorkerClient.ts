@@ -18,54 +18,57 @@ type PendingRequest = {
   timeoutRef: ReturnType<typeof setTimeout>;
 };
 
+type NodeWorkerLike = {
+  postMessage: (message: AnalysisWorkerRequest) => void;
+  on: (event: 'message' | 'error', listener: (...args: any[]) => void) => void;
+  terminate: () => Promise<number> | number;
+};
+
+type RuntimeWorker = Worker | NodeWorkerLike;
+
+const dynamicImport = (specifier: string): Promise<any> => {
+  const importer = new Function('value', 'return import(value)') as (value: string) => Promise<any>;
+  return importer(specifier);
+};
+
+const isNodeRuntime = () => {
+  return (
+    typeof window === 'undefined'
+    && typeof process !== 'undefined'
+    && Boolean(process.versions?.node)
+  );
+};
+
 class AnalysisWorkerClient {
-  private worker: Worker | null = null;
+  private worker: RuntimeWorker | null = null;
   private requestId = 0;
   private pending = new Map<number, PendingRequest>();
 
-  private ensureWorker(): Worker {
-    if (this.worker) return this.worker;
+  private handleWorkerMessage(message: AnalysisWorkerResponse) {
+    const pendingRequest = this.pending.get(message.id);
+    if (!pendingRequest) return;
 
-    const worker = new Worker(new URL('../workers/analysis.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    clearTimeout(pendingRequest.timeoutRef);
+    this.pending.delete(message.id);
 
-    worker.onmessage = (event: MessageEvent<AnalysisWorkerResponse>) => {
-      const message = event.data;
-      const pendingRequest = this.pending.get(message.id);
-      if (!pendingRequest) return;
+    if (message.type === 'ANALYSIS_ERROR') {
+      pendingRequest.reject(new Error(message.error));
+      return;
+    }
 
-      clearTimeout(pendingRequest.timeoutRef);
-      this.pending.delete(message.id);
+    if (message.type !== pendingRequest.expected) {
+      pendingRequest.reject(
+        new Error(`Unexpected worker response. Expected ${pendingRequest.expected}, received ${message.type}`),
+      );
+      return;
+    }
 
-      if (message.type === 'ANALYSIS_ERROR') {
-        pendingRequest.reject(new Error(message.error));
-        return;
-      }
+    if (message.type === 'GENERATE_SIGNAL_RESULT') {
+      pendingRequest.resolve(message.signal);
+      return;
+    }
 
-      if (message.type !== pendingRequest.expected) {
-        pendingRequest.reject(
-          new Error(`Unexpected worker response. Expected ${pendingRequest.expected}, received ${message.type}`),
-        );
-        return;
-      }
-
-      if (message.type === 'GENERATE_SIGNAL_RESULT') {
-        pendingRequest.resolve(message.signal);
-        return;
-      }
-
-      pendingRequest.resolve(message.orderIntent);
-    };
-
-    worker.onerror = (event) => {
-      const error = new Error(event.message || 'Analysis worker crashed');
-      this.rejectAll(error);
-      this.worker = null;
-    };
-
-    this.worker = worker;
-    return worker;
+    pendingRequest.resolve(message.orderIntent);
   }
 
   private rejectAll(error: Error) {
@@ -76,12 +79,90 @@ class AnalysisWorkerClient {
     this.pending.clear();
   }
 
-  private sendRequest(
+  private createBrowserWorker(): Worker {
+    const worker = new Worker(new URL('../workers/analysis.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+
+    worker.onmessage = (event: MessageEvent<AnalysisWorkerResponse>) => {
+      this.handleWorkerMessage(event.data);
+    };
+
+    worker.onerror = (event) => {
+      const error = new Error(event.message || 'Analysis worker crashed');
+      this.rejectAll(error);
+      this.worker = null;
+    };
+
+    return worker;
+  }
+
+  private async resolveNodeWorkerPath(): Promise<string> {
+    const [pathModule, urlModule, fsModule] = await Promise.all([
+      dynamicImport('node:path'),
+      dynamicImport('node:url'),
+      dynamicImport('node:fs'),
+    ]);
+
+    const currentFilePath = urlModule.fileURLToPath(import.meta.url);
+    const currentDir = pathModule.dirname(currentFilePath);
+
+    const candidates = [
+      pathModule.resolve(currentDir, '../workers/analysis.node.worker.js'),
+      pathModule.resolve(currentDir, './analysis.node.worker.js'),
+      pathModule.resolve(process.cwd(), 'dist-bot/analysis.node.worker.js'),
+    ];
+
+    const detected = candidates.find((candidate: string) => fsModule.existsSync(candidate));
+    if (!detected) {
+      throw new Error(`Node analysis worker not found. Checked: ${candidates.join(', ')}`);
+    }
+
+    return detected;
+  }
+
+  private async createNodeWorker(): Promise<NodeWorkerLike> {
+    const [{ Worker }, urlModule] = await Promise.all([
+      dynamicImport('node:worker_threads'),
+      dynamicImport('node:url'),
+    ]);
+
+    const workerFilePath = await this.resolveNodeWorkerPath();
+
+    const worker = new Worker(urlModule.pathToFileURL(workerFilePath), {
+      type: 'module',
+    });
+
+    worker.on('message', (message: AnalysisWorkerResponse) => {
+      this.handleWorkerMessage(message);
+    });
+
+    worker.on('error', (error: Error) => {
+      this.rejectAll(error);
+      this.worker = null;
+    });
+
+    return worker;
+  }
+
+  private async ensureWorker(): Promise<RuntimeWorker> {
+    if (this.worker) return this.worker;
+
+    if (isNodeRuntime()) {
+      this.worker = await this.createNodeWorker();
+      return this.worker;
+    }
+
+    this.worker = this.createBrowserWorker();
+    return this.worker;
+  }
+
+  private async sendRequest(
     request: AnalysisWorkerRequest,
     expected: ExpectedResponseType,
     timeoutMs: number,
   ): Promise<PendingResolveValue> {
-    const worker = this.ensureWorker();
+    const worker = await this.ensureWorker();
 
     return new Promise<PendingResolveValue>((resolve, reject) => {
       const timeoutRef = setTimeout(() => {
@@ -122,7 +203,7 @@ class AnalysisWorkerClient {
 
   dispose() {
     if (this.worker) {
-      this.worker.terminate();
+      void Promise.resolve(this.worker.terminate());
       this.worker = null;
     }
     this.rejectAll(new Error('Analysis worker client disposed'));

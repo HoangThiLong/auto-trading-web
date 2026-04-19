@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import CryptoJS from 'crypto-js';
+import { readRuntimeEnv } from '../utils/runtimeEnv';
 import type { ContractTicker, KlineData, OrderBook, FundingRate, ContractInfo, TimeInterval, RecentTrade } from '../types';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -46,48 +47,144 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   }
 }
 
-const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
-const stripLeadingSlashes = (value: string) => value.replace(/^\/+/, '');
-
-const joinUrl = (base: string, path: string): string => {
-  const safeBase = stripTrailingSlashes(base);
-  const safePath = stripLeadingSlashes(path);
-  return `${safeBase}/${safePath}`;
+// MEXC Network URLs - determined at runtime
+const MEXC_NETWORKS = {
+  live: {
+    rest: 'https://contract.mexc.com',
+    ws: 'wss://contract.mexc.com/edge',
+  },
+  demo: {
+    rest: 'https://contract-testnet.mexc.com',
+    ws: 'wss://contract-testnet.mexc.com/edge',
+  },
 };
 
-const resolveMexcApiRoot = (): string => {
-  const configuredBaseUrl = import.meta.env.VITE_TIMESFM_API_BASE_URL?.trim();
+const getMexcNetwork = (): 'live' | 'demo' => {
+  // Priority: runtimeEnv > credentials.mexcNetwork > default 'live'
+  const envNetwork = readRuntimeEnv('MEXC_NETWORK');
+  if (envNetwork === 'demo' || envNetwork === 'live') return envNetwork;
+  return 'live';
+};
 
-  // Production must go through backend proxy.
-  if (import.meta.env.PROD) {
-    if (!configuredBaseUrl) {
-      console.error('[MEXC API] Missing VITE_TIMESFM_API_BASE_URL in production environment.');
-      return '/__missing_backend_base_url__/api/proxy/mexc_v1';
+// Current network config
+const mexcConfig = MEXC_NETWORKS[getMexcNetwork()];
+const MEXC_API_ROOT = mexcConfig.rest;
+const MEXC_WS_URL = mexcConfig.ws;
+
+// ─── Time Sync Manager (NTP-like offset against MEXC server) ────────────────
+
+class TimeSyncManager {
+  private offsetMs = 0;
+  private lastSyncAt = 0;
+  private syncIntervalRef: ReturnType<typeof setInterval> | null = null;
+  private static readonly SYNC_INTERVAL_MS = 5 * 60_000; // 5 minutes
+  private static readonly SYNC_TIMEOUT_MS = 5_000;
+  private static readonly MAX_RETRIES = 3;
+
+  /**
+   * Returns the current server-corrected timestamp as a string.
+   * If sync has never succeeded, falls back to local time (offset = 0).
+   */
+  getServerTimestamp(): string {
+    return (Date.now() + this.offsetMs).toString();
+  }
+
+  /** Current offset in ms (server - local). Positive = server ahead. */
+  getOffset(): number {
+    return this.offsetMs;
+  }
+
+  /**
+   * Synchronize local clock against MEXC `/api/v1/contract/ping`.
+   * Uses round-trip compensation for accuracy.
+   */
+  async syncTime(): Promise<void> {
+    for (let attempt = 0; attempt < TimeSyncManager.MAX_RETRIES; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          TimeSyncManager.SYNC_TIMEOUT_MS,
+        );
+
+        const t0 = Date.now();
+        const res = await fetch(`${MEXC_API_ROOT}/api/v1/contract/ping`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          console.warn(`[TimeSync] Ping returned HTTP ${res.status}, attempt ${attempt + 1}`);
+          await wait(1000 * (attempt + 1));
+          continue;
+        }
+
+        const data = await res.json();
+        const t1 = Date.now();
+        const roundTripMs = t1 - t0;
+
+        // MEXC contract /ping returns { data: serverTime(ms) }
+        const serverTime = data?.data ?? data?.serverTime ?? null;
+        if (typeof serverTime !== 'number' || serverTime <= 0) {
+          console.warn('[TimeSync] Invalid server time response:', data);
+          await wait(1000 * (attempt + 1));
+          continue;
+        }
+
+        // Estimate: serverTime was captured at t0 + roundTrip/2
+        this.offsetMs = serverTime - (t0 + Math.floor(roundTripMs / 2));
+        this.lastSyncAt = t1;
+
+        console.log(
+          `[TimeSync] ✅ Synced | offset=${this.offsetMs}ms | roundTrip=${roundTripMs}ms`,
+        );
+        return;
+      } catch (err: any) {
+        const isAbort = err?.name === 'AbortError';
+        console.warn(
+          `[TimeSync] ${isAbort ? 'Timeout' : 'Error'} (attempt ${attempt + 1}/${TimeSyncManager.MAX_RETRIES}):`,
+          err?.message || err,
+        );
+        await wait(1000 * (attempt + 1));
+      }
     }
-    return joinUrl(configuredBaseUrl, '/api/proxy/mexc_v1');
+
+    console.error('[TimeSync] ❌ All sync attempts failed, using local time (offset=0)');
   }
 
-  // Local dev can use Vite proxy. If env is set locally, still allow proxy routing via backend.
-  if (configuredBaseUrl) {
-    return joinUrl(configuredBaseUrl, '/api/proxy/mexc_v1');
+  /** Start periodic sync. Safe to call multiple times. */
+  startAutoSync(): void {
+    if (this.syncIntervalRef) return;
+
+    // Initial sync
+    void this.syncTime();
+
+    this.syncIntervalRef = setInterval(() => {
+      void this.syncTime();
+    }, TimeSyncManager.SYNC_INTERVAL_MS);
   }
 
-  return '';
-};
-
-const MEXC_API_ROOT = resolveMexcApiRoot();
-
-const mapEndpointForTarget = (url: string): string => {
-  if (!MEXC_API_ROOT) {
-    return url;
+  /** Stop periodic sync. */
+  stopAutoSync(): void {
+    if (this.syncIntervalRef) {
+      clearInterval(this.syncIntervalRef);
+      this.syncIntervalRef = null;
+    }
   }
-  // Backend proxy expects: /api/proxy/mexc_v1/<endpoint-after-/api/v1/>
-  return url.replace(/^\/api\/v1\//, '/');
-};
+}
+
+export const timeSyncManager = new TimeSyncManager();
+
+// Auto-start time sync on module load
+timeSyncManager.startAutoSync();
 
 const buildRequestUrl = (url: string): string => {
-  const endpoint = mapEndpointForTarget(url);
-  return MEXC_API_ROOT ? joinUrl(MEXC_API_ROOT, endpoint) : endpoint;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  const normalizedPath = url.startsWith('/') ? url : `/${url}`;
+  return `${MEXC_API_ROOT}${normalizedPath}`;
 };
 
 const api = {
@@ -220,7 +317,7 @@ function signRequest(apiKey: string, secretKey: string, timestamp: string, body?
 
 export async function fetchAccountInfo(apiKey: string, secretKey: string) {
   try {
-    const timestamp = Date.now().toString();
+    const timestamp = timeSyncManager.getServerTimestamp();
     const signature = signRequest(apiKey, secretKey, timestamp);
 
     const data = await api.get('/api/v1/private/account/assets', {
@@ -255,7 +352,7 @@ export async function placeOrder(
   }
 ) {
   try {
-    const timestamp = Date.now().toString();
+    const timestamp = timeSyncManager.getServerTimestamp();
     const body = JSON.stringify(params);
     const signature = signRequest(apiKey, secretKey, timestamp, body);
 
@@ -275,7 +372,7 @@ export async function placeOrder(
 
 export async function fetchOpenPositions(apiKey: string, secretKey: string) {
   try {
-    const timestamp = Date.now().toString();
+    const timestamp = timeSyncManager.getServerTimestamp();
     const signature = signRequest(apiKey, secretKey, timestamp);
 
     const data = await api.get('/api/v1/private/position/open_positions', {
@@ -294,7 +391,7 @@ export async function fetchOpenPositions(apiKey: string, secretKey: string) {
 
 export async function fetchOpenOrders(apiKey: string, secretKey: string, symbol?: string) {
   try {
-    const timestamp = Date.now().toString();
+    const timestamp = timeSyncManager.getServerTimestamp();
     const signature = signRequest(apiKey, secretKey, timestamp);
 
     const data = await api.get('/api/v1/private/order/list/open_orders/' + (symbol || ''), {
@@ -318,14 +415,46 @@ type WsCallback = (data: any) => void;
 
 class MexcWebSocketManager {
   private ws: WebSocket | null = null;
-  private url = 'wss://contract.mexc.com/edge';
+  private url = MEXC_WS_URL;
   private pingInterval: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnecting = false;
-  
+
+  // Exponential Backoff state
+  private reconnectAttempts = 0;
+  private static readonly BASE_DELAY_MS = 1_000;   // Start at 1 second
+  private static readonly MAX_DELAY_MS = 30_000;    // Cap at 30 seconds
+  private static readonly MAX_JITTER_MS = 1_000;    // Random jitter 0-1s
+
   private subscriptions: Set<string> = new Set();
   private subscriptionRefCounts: Map<string, number> = new Map();
   private callbacks: Map<string, Set<WsCallback>> = new Map();
+
+  /**
+   * Calculate next reconnection delay using exponential backoff with jitter.
+   * delay = min(baseDelay * 2^attempt + random_jitter, maxDelay)
+   */
+  private getReconnectDelay(): number {
+    const exponentialDelay = MexcWebSocketManager.BASE_DELAY_MS * Math.pow(2, this.reconnectAttempts);
+    const jitter = Math.random() * MexcWebSocketManager.MAX_JITTER_MS;
+    return Math.min(exponentialDelay + jitter, MexcWebSocketManager.MAX_DELAY_MS);
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+
+    const delay = this.getReconnectDelay();
+    console.log(
+      `[MEXC WS] Scheduling reconnect attempt #${this.reconnectAttempts + 1} in ${Math.round(delay)}ms`,
+    );
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectAttempts++;
+      this.connect();
+    }, delay);
+  }
 
   connect() {
     if (this.ws || this.isConnecting) return;
@@ -336,7 +465,12 @@ class MexcWebSocketManager {
       
       this.ws.onopen = () => {
         this.isConnecting = false;
-        console.log('[MEXC WS] Connected');
+        // Reset backoff counter on successful connection
+        const wasReconnect = this.reconnectAttempts > 0;
+        this.reconnectAttempts = 0;
+        console.log(
+          `[MEXC WS] ✅ Connected${wasReconnect ? ' (reconnected successfully)' : ''}`,
+        );
         this.startPing();
         this.resubscribeAll();
       };
@@ -356,13 +490,9 @@ class MexcWebSocketManager {
       };
 
       this.ws.onclose = () => {
-        console.log('[MEXC WS] Disconnected, reconnecting in 3s...');
+        console.log('[MEXC WS] ⚠️ Disconnected');
         this.cleanup();
-        // Prevent multiple reconnection timers by clearing the existing one
-        if (this.reconnectTimer) {
-          clearTimeout(this.reconnectTimer);
-        }
-        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+        this.scheduleReconnect();
       };
 
       this.ws.onerror = (err) => {
@@ -372,11 +502,7 @@ class MexcWebSocketManager {
     } catch (err) {
       console.error('[MEXC WS] Init error', err);
       this.isConnecting = false;
-      // Prevent multiple reconnection timers by clearing the existing one
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-      }
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      this.scheduleReconnect();
     }
   }
 

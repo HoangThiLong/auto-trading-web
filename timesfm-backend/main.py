@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import List
 
 import numpy as np
@@ -32,6 +33,17 @@ app.include_router(proxy_router)
 model = None
 model_mode = None  # "v2_5" | "legacy"
 MAX_HORIZON = 256
+
+# ─── Concurrency Control ────────────────────────────────────────────────────
+# Semaphore limits concurrent model inference to prevent OOM on GPU/CPU.
+# MAX_CONCURRENT_INFERENCES can be tuned via environment variable.
+MAX_CONCURRENT_INFERENCES = int(os.getenv("MAX_CONCURRENT_INFERENCES", "2"))
+inference_semaphore = asyncio.Semaphore(MAX_CONCURRENT_INFERENCES)
+
+# Track active/queued requests for observability
+_active_inferences = 0
+_total_inferences = 0
+_rejected_inferences = 0
 
 
 @app.on_event("startup")
@@ -96,19 +108,57 @@ def health():
     }
 
 
+@app.get("/api/forecast/status")
+async def forecast_status():
+    """Returns the current inference queue status for observability."""
+    return {
+        "max_concurrent": MAX_CONCURRENT_INFERENCES,
+        "active_inferences": _active_inferences,
+        "total_processed": _total_inferences,
+        "total_rejected": _rejected_inferences,
+        "queue_available": inference_semaphore._value,
+    }
+
+
 @app.post("/api/forecast")
-def forecast(req: ForecastRequest):
+async def forecast(req: ForecastRequest):
+    global _active_inferences, _total_inferences, _rejected_inferences
+
     if not model:
         raise HTTPException(status_code=503, detail="Model is not loaded or missing dependencies.")
 
     if req.horizon < 1 or req.horizon > MAX_HORIZON:
         raise HTTPException(status_code=400, detail=f"horizon must be between 1 and {MAX_HORIZON}")
 
-    inputs = [np.array(req.history, dtype=np.float32)]
+    # Non-blocking check: if all slots are occupied, reject immediately with 503
+    # This prevents HeadlessBot from hanging indefinitely waiting for inference
+    if inference_semaphore._value <= 0:
+        _rejected_inferences += 1
+        raise HTTPException(
+            status_code=503,
+            detail=f"Inference queue full ({MAX_CONCURRENT_INFERENCES} concurrent max). Retry later.",
+        )
+
+    async with inference_semaphore:
+        _active_inferences += 1
+        try:
+            # Run model inference in a thread pool to avoid blocking the event loop
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, _run_inference, req.history, req.horizon
+            )
+            _total_inferences += 1
+            return {"point_forecast": result}
+        finally:
+            _active_inferences -= 1
+
+
+def _run_inference(history: List[float], horizon: int) -> List[float]:
+    """Synchronous model inference, executed in thread pool."""
+    inputs = [np.array(history, dtype=np.float32)]
 
     if model_mode == "v2_5":
         point_forecast, _ = model.forecast(
-            horizon=req.horizon,
+            horizon=horizon,
             inputs=inputs,
         )
         result = point_forecast[0]
@@ -118,11 +168,9 @@ def forecast(req: ForecastRequest):
             inputs=inputs,
             freq=[0],
         )
-        result = point_forecast[0][:req.horizon]
+        result = point_forecast[0][:horizon]
 
-    return {
-        "point_forecast": result.tolist(),
-    }
+    return result.tolist()
 
 
 if __name__ == "__main__":

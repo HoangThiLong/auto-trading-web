@@ -199,31 +199,39 @@ export function calcStochRSI(closes: number[], period = 14): number {
 // ─── AI Signal Engine ─────────────────────────────────────────────────────
 
 export function detectMarketRegime(candles: CandlePoint[]): 'TRENDING' | 'RANGING' | 'VOLATILE' {
+  if (candles.length < 10) return 'RANGING';
+
   const closes = candles.map(c => c.close);
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
 
   // Use ATR to measure volatility
   const atr = calcATR(candles, 14);
-  const priceRange = Math.max(...highs) - Math.min(...lows);
-  
+  const currentPrice = closes[closes.length - 1];
+
   // Measure trending using higher time frame momentum
   const lookback = Math.min(50, candles.length);
   const startPeriod = closes[closes.length - lookback];
-  const current = closes[closes.length - 1];
-  const momentum = Math.abs(current - startPeriod) / atr;
-  
-  // Range measurement: compare average candle size to overall range
-  let avgCandleSize = 0;
-  for(let i = 1; i < candles.length; i++) {
-    avgCandleSize += Math.abs(candles[i].close - candles[i].open);
-  }
-  avgCandleSize /= candles.length;
-  const rangeEfficiency = priceRange / (Math.max(...highs) - Math.min(...lows));
+  const momentum = Math.abs(currentPrice - startPeriod) / atr;
 
-  if (momentum > 3 && rangeEfficiency > 0.7) return 'TRENDING';
-  else if (atr > 0.02 * current && momentum < 2) return 'VOLATILE'; // High volatility
-  else return 'RANGING';
+  // Directional Efficiency Ratio (DER)
+  // directionalMove = net price change (first → last)
+  // totalPathLength = sum of all individual bar-to-bar moves
+  // rangeEfficiency → 1.0 = perfectly trending, → 0.0 = perfectly choppy/ranging
+  const directionalMove = Math.abs(closes[closes.length - 1] - closes[0]);
+  let totalPathLength = 0;
+  for (let i = 1; i < closes.length; i++) {
+    totalPathLength += Math.abs(closes[i] - closes[i - 1]);
+  }
+  const rangeEfficiency = totalPathLength > 0 ? directionalMove / totalPathLength : 0;
+
+  // Classification rules:
+  // 1. Strong trend: high efficiency + confirmed momentum
+  if (rangeEfficiency > 0.65 && momentum > 3) return 'TRENDING';
+  // 2. High volatility but choppy: large ATR relative to price + low efficiency
+  if (atr > 0.02 * currentPrice && rangeEfficiency < 0.35) return 'VOLATILE';
+  // 3. Moderate trend detection: relaxed thresholds
+  if (rangeEfficiency > 0.5 && momentum > 2) return 'TRENDING';
+  // 4. Default: ranging/consolidation
+  return 'RANGING';
 }
 
 export function generateSignal(candles: CandlePoint[]): TradeSignal {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, type StateStorage } from 'zustand/middleware';
 import type {
   ApiCredentials,
   AiModelCredentials,
@@ -11,6 +11,7 @@ import type {
   PendingOrder,
   TradeSignal,
 } from '../types';
+import { encryptCredentials, decryptCredentials, isElectronSecureMode } from '../utils/credentialCrypto';
 import { createMarketDataSlice, type MarketDataSlice } from './slices/marketDataSlice';
 import { createUiSlice, type UiSlice } from './slices/uiSlice';
 
@@ -19,6 +20,7 @@ interface AppState extends MarketDataSlice, UiSlice {
   credentials: ApiCredentials | null;
   isApiConnected: boolean;
   aiCredentials: AiModelCredentials | null;
+  mexcNetwork: 'live' | 'demo';
 
   // Trading signals
   signals: Record<string, TradeSignal>;
@@ -50,6 +52,7 @@ interface AppState extends MarketDataSlice, UiSlice {
   setCredentials: (creds: ApiCredentials | null) => void;
   setIsApiConnected: (v: boolean) => void;
   setAiCredentials: (creds: AiModelCredentials | null) => void;
+  setMexcNetwork: (network: 'live' | 'demo') => void;
   setSignal: (symbol: string, signal: TradeSignal) => void;
   setIsAnalyzing: (v: boolean) => void;
   setCurrentAiProvider: (provider: string) => void;
@@ -72,6 +75,46 @@ interface AppState extends MarketDataSlice, UiSlice {
   setNewsLoading: (v: boolean) => void;
 }
 
+type SecureCredentialPayload = {
+  credentials: ApiCredentials | null;
+  aiCredentials: AiModelCredentials | null;
+  mexcNetwork: 'live' | 'demo';
+};
+
+type ElectronApiBridge = {
+  saveCredentials: (payload: SecureCredentialPayload) => Promise<{ success: boolean; error?: string }>;
+  loadCredentials: () => Promise<SecureCredentialPayload | null>;
+  clearCredentials: () => Promise<{ success: boolean; error?: string }>;
+};
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronApiBridge;
+  }
+}
+
+const getElectronApi = (): ElectronApiBridge | null => {
+  if (typeof window === 'undefined' || !window.electronAPI) {
+    return null;
+  }
+  return window.electronAPI;
+};
+
+const syncSecureCredentials = async (payload: SecureCredentialPayload) => {
+  const electronApi = getElectronApi();
+  if (!electronApi) return;
+
+  try {
+    if (!payload.credentials && !payload.aiCredentials) {
+      await electronApi.clearCredentials();
+      return;
+    }
+    await electronApi.saveCredentials(payload);
+  } catch (error) {
+    console.error('[secure-credentials] Failed to sync credentials:', error);
+  }
+};
+
 const DEFAULT_AUTO_TRADE_CONFIG: AutoTradeConfig = {
   minConfidence: 70,
   riskPercentPerTrade: 1,
@@ -84,6 +127,69 @@ const DEFAULT_AUTO_TRADE_CONFIG: AutoTradeConfig = {
   scanAllMarket: true,
 };
 
+// ─── Encrypted Storage Adapter ──────────────────────────────────────────────
+// For non-Electron mode, sensitive fields are AES-encrypted before localStorage.
+// Electron mode uses OS-level safeStorage instead (no encryption needed here).
+
+const SENSITIVE_KEYS = ['credentials', 'aiCredentials', 'mexcNetwork'] as const;
+const ENCRYPTED_MARKER = '__enc__';
+
+const encryptedStorage: StateStorage = {
+  getItem: (name: string): string | null => {
+    const raw = localStorage.getItem(name);
+    if (!raw) return null;
+
+    // If Electron safeStorage is available, skip AES decryption
+    if (isElectronSecureMode()) return raw;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.state) {
+        for (const key of SENSITIVE_KEYS) {
+          const markerKey = `${ENCRYPTED_MARKER}${key}`;
+          if (typeof parsed.state[markerKey] === 'string') {
+            const decrypted = decryptCredentials(parsed.state[markerKey]);
+            if (decrypted !== null) {
+              parsed.state[key] = decrypted;
+            }
+            delete parsed.state[markerKey];
+          }
+        }
+      }
+      return JSON.stringify(parsed);
+    } catch {
+      return raw;
+    }
+  },
+
+  setItem: (name: string, value: string): void => {
+    // If Electron safeStorage is available, skip AES encryption
+    if (isElectronSecureMode()) {
+      localStorage.setItem(name, value);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed?.state) {
+        for (const key of SENSITIVE_KEYS) {
+          if (parsed.state[key] != null) {
+            parsed.state[`${ENCRYPTED_MARKER}${key}`] = encryptCredentials(parsed.state[key]);
+            delete parsed.state[key];
+          }
+        }
+      }
+      localStorage.setItem(name, JSON.stringify(parsed));
+    } catch {
+      localStorage.setItem(name, value);
+    }
+  },
+
+  removeItem: (name: string): void => {
+    localStorage.removeItem(name);
+  },
+};
+
 export const useStore = create<AppState>()(
   persist(
     (...args) => ({
@@ -93,6 +199,7 @@ export const useStore = create<AppState>()(
       credentials: null,
       isApiConnected: false,
       aiCredentials: null,
+      mexcNetwork: 'live',
       signals: {},
       isAnalyzing: false,
       currentAiProvider: 'local',
@@ -110,9 +217,31 @@ export const useStore = create<AppState>()(
       marketSentiment: 'NEUTRAL',
       newsLoading: false,
 
-      setCredentials: (credentials) => args[0]({ credentials }),
+      setCredentials: (credentials) => {
+        args[0]({ credentials });
+        void syncSecureCredentials({
+          credentials,
+          aiCredentials: args[1]().aiCredentials,
+          mexcNetwork: args[1]().mexcNetwork,
+        });
+      },
       setIsApiConnected: (isApiConnected) => args[0]({ isApiConnected }),
-      setAiCredentials: (aiCredentials) => args[0]({ aiCredentials }),
+      setAiCredentials: (aiCredentials) => {
+        args[0]({ aiCredentials });
+        void syncSecureCredentials({
+          credentials: args[1]().credentials,
+          aiCredentials,
+          mexcNetwork: args[1]().mexcNetwork,
+        });
+      },
+      setMexcNetwork: (mexcNetwork) => {
+        args[0]({ mexcNetwork });
+        void syncSecureCredentials({
+          credentials: args[1]().credentials,
+          aiCredentials: args[1]().aiCredentials,
+          mexcNetwork,
+        });
+      },
       setSignal: (symbol, signal) =>
         args[0]((state) => ({ signals: { ...state.signals, [symbol]: signal } })),
       setIsAnalyzing: (isAnalyzing) => args[0]({ isAnalyzing }),
@@ -151,9 +280,8 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'mexc-pro-v2',
+      storage: encryptedStorage,
       partialize: (state) => ({
-        credentials: state.credentials,
-        aiCredentials: state.aiCredentials,
         selectedSymbol: state.selectedSymbol,
         selectedInterval: state.selectedInterval,
         sidebarOpen: state.sidebarOpen,
@@ -165,7 +293,34 @@ export const useStore = create<AppState>()(
         autoTradeMode: state.autoTradeMode,
         autoTradeRunning: state.autoTradeRunning,
         demoBalance: state.demoBalance,
+        // Sensitive fields — encrypted via encryptedStorage adapter
+        credentials: state.credentials,
+        aiCredentials: state.aiCredentials,
+        mexcNetwork: state.mexcNetwork,
       }),
     }
   )
 );
+
+const hydrateSecureCredentials = async () => {
+  const electronApi = getElectronApi();
+  if (!electronApi) return;
+
+  try {
+    const loaded = await electronApi.loadCredentials();
+    if (!loaded) return;
+
+    useStore.setState({
+      credentials: loaded.credentials ?? null,
+      aiCredentials: loaded.aiCredentials ?? null,
+    });
+  } catch (error) {
+    console.error('[secure-credentials] Failed to load credentials:', error);
+  }
+};
+
+if (typeof window !== 'undefined') {
+  queueMicrotask(() => {
+    void hydrateSecureCredentials();
+  });
+}

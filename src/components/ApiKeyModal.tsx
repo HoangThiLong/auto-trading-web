@@ -13,11 +13,13 @@ export default function ApiKeyModal() {
     apiModalOpen, setApiModalOpen,
     credentials, setCredentials, setIsApiConnected,
     aiCredentials, setAiCredentials,
+    mexcNetwork, setMexcNetwork,
   } = useApiKeyModalState();
 
   const [tab, setTab] = useState<'mexc' | 'ai' | 'security'>('mexc');
   const [apiKey, setApiKey] = useState(credentials?.apiKey || '');
   const [secretKey, setSecretKey] = useState(credentials?.secretKey || '');
+  const [network, setNetwork] = useState<'live' | 'demo'>(mexcNetwork || 'live');
   const [showSecret, setShowSecret] = useState(false);
   const [testing, setTesting] = useState(false);
   const [mexcTouched, setMexcTouched] = useState(false);
@@ -50,7 +52,8 @@ export default function ApiKeyModal() {
     setTesting(true);
     try {
       const info = await fetchAccountInfo(apiKey, secretKey);
-      setCredentials({ apiKey, secretKey });
+      setCredentials({ apiKey, secretKey, mexcNetwork: network });
+      setMexcNetwork(network);
       if (info) {
         setIsApiConnected(true);
         toast.success('✅ MEXC API kết nối thành công!');
@@ -145,8 +148,42 @@ export default function ApiKeyModal() {
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <div className="mb-1.5 font-bold">Lưu ý về Futures API MEXC</div>
-                  <div className="leading-relaxed">Đặt lệnh Futures qua API yêu cầu tài khoản tổ chức (institutional). Người dùng cá nhân vẫn xem được dữ liệu thị trường đầy đủ.</div>
+                  <div className="leading-relaxed">Đặt lệnh Futures qua API yêu cầu tài khoản từ sàn (institutional). Người dùng cá nhân vẫn xem được dữ liệu thị trường đầy đủ.</div>
                 </div>
+              </div>
+
+              {/* Network Selector */}
+              <div className="coinbase-surface-soft rounded-2xl p-5">
+                <label className="mb-3 block text-xs uppercase tracking-wider text-[var(--text-muted)]">Môi trường</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setNetwork('live')}
+                    className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${
+                      network === 'live'
+                        ? 'border-[rgba(14,203,129,0.5)] bg-[rgba(14,203,129,0.15)] text-[#95f4ca]'
+                        : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[rgba(148,163,184,0.5)] hover:text-white'
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${network === 'live' ? 'bg-[#10b981]' : 'bg-[var(--border)]'}`} />
+                    Live (Tiền thật)
+                  </button>
+                  <button
+                    onClick={() => setNetwork('demo')}
+                    className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${
+                      network === 'demo'
+                        ? 'border-[rgba(59,130,246,0.5)] bg-[rgba(59,130,246,0.15)] text-[#60a5fa]'
+                        : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[rgba(148,163,184,0.5)] hover:text-white'
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${network === 'demo' ? 'bg-[#3b82f6]' : 'bg-[var(--border)]'}`} />
+                    Demo (Testnet)
+                  </button>
+                </div>
+                {network === 'demo' && (
+                  <p className="mt-3 text-xs text-amber-400">
+                    ⚠️ API Key của tài khoản Demo được tạo riêng trên trang Testnet của MEXC, không dùng chung với Live.
+                  </p>
+                )}
               </div>
 
               {/* Inputs */}

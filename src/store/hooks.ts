@@ -104,6 +104,8 @@ const apiKeyModalSelector = (state: StoreState) => ({
   setIsApiConnected: state.setIsApiConnected,
   aiCredentials: state.aiCredentials,
   setAiCredentials: state.setAiCredentials,
+  mexcNetwork: state.mexcNetwork,
+  setMexcNetwork: state.setMexcNetwork,
 });
 
 export const useTickers = () => useStore((state) => state.tickers);

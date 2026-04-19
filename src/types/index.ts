@@ -103,6 +103,7 @@ export interface TradeSignal {
 export interface ApiCredentials {
   apiKey: string;
   secretKey: string;
+  mexcNetwork: 'live' | 'demo'; // 'live' = contract.mexc.com, 'demo' = testnet
 }
 
 // ─── Multi-AI Provider Credentials ─────────────────────────────────────────
