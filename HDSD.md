@@ -1,117 +1,123 @@
-# Hướng Dẫn Sử Dụng: MEXC Pro Futures Terminal v2
+# Hướng Dẫn Sử Dụng Chi Tiết Bot MEXC Pro Futures v2
 
-## 🌟 Giới thiệu tổng quan
-
-MEXC Pro Futures Terminal v2 là phần mềm giao dịch tự động **cấp độ production** dành riêng cho thị trường hợp đồng tương lai (Futures) trên sàn MEXC. Hệ thống hỗ trợ 2 chế độ vận hành:
-
-| Chế độ | Mô tả | Khi nào dùng |
-|---|---|---|
-| **Desktop** | Ứng dụng Electron với giao diện đầy đủ | Giao dịch trực quan, theo dõi biểu đồ |
-| **Headless** | Bot Node.js chạy ngầm, điều khiển qua REST API | Chạy 24/7 trên VPS |
+Tài liệu này hướng dẫn đầy đủ cách cài đặt, cấu hình và vận hành Bot giao dịch tự động cho hai nền tảng: Máy tính (Windows/Mac/Linux) và Điện thoại Android (Termux).
 
 ---
 
-## 🔧 Tính năng chính
+## Phần 1. Chuẩn Bị Trước Khi Chạy Bot
 
-### 1. Phân tích và tín hiệu giao dịch
-- **AI Signal Engine**: 4 nhà cung cấp AI (Gemini, Groq, OpenRouter, Together) tranh luận để xác nhận tín hiệu
-- **TimesFM**: Dự báo giá dựa trên mô hình Machine Learning của Google Research
-- **Phân tích kỹ thuật**: RSI, MACD, Bollinger Bands, EMA (20/50/200), ATR, Volume
-- **Lọc tin tức**: Tự động phân tích tin tức crypto để đánh giá tâm lý thị trường
+### Bước 1.1: Lấy Khóa API từ Sàn MEXC
 
-### 2. Thực thi lệnh
-- Đặt lệnh thật trực tiếp lên MEXC qua API
-- Chế độ **Simulation** để thử nghiệm không mất tiền
-- Tự động gợi ý mức **Take Profit** và **Stop Loss** tối ưu
-- Trailing Stop động
+Để bot có thể đọc dữ liệu tài khoản và đặt lệnh giao dịch, bạn cần tạo API Key trên sàn MEXC.
 
-### 3. Khả năng chịu lỗi (Phase 2 - mới)
-- **Circuit Breaker**: Khi dịch vụ bên ngoài sập (TimesFM, AI), hệ thống tự động cô lập và fallback
-- **WebSocket Backoff**: Kết nối lại thông minh (1s → 2s → 4s → 8s... max 30s) tránh bị sàn chặn IP
-- **Symbol Blacklist**: Coin lỗi liên tục sẽ bị tạm dừng 15 phút để bảo vệ vòng lặp
-- **SQLite**: Lưu toàn bộ dữ liệu vào file `logs/bot.db` — không mất dữ liệu khi khởi động lại
+1.  Đăng nhập vào trang chủ [MEXC.com](https://www.mexc.com/).
+2.  Rê chuột vào biểu tượng hồ sơ cá nhân ở góc trên cùng bên phải → Chọn **Quản lý API**.
+3.  Bấm **Tạo API**.
+4.  Chọn quyền:
+    -   ✅ Đọc dữ liệu tài khoản (Read)
+    -   ✅ Giao dịch Futures (Trade)
+    -   ❌ **KHÔNG CHỌN** quyền Rút tiền (Withdraw) vì lý do bảo mật.
+5.  Sau khi hoàn tất xác minh, MEXC sẽ hiển thị 2 mã:
+    -   `Access Key` (API Key)
+    -   `Secret Key`
+6.  **Lưu lại ngay** vì Secret Key chỉ hiện một lần duy nhất.
 
-### 4. Điều khiển từ xa
-- REST API trên port 3000 với 7 endpoint
-- Xem trạng thái, bật/dừng bot, xem log từ bất cứ đâu
+### Bước 1.2: Lấy Khóa AI Gemini
+
+Bot cần AI để phân tích và đưa ra quyết định giao dịch.
+
+1.  Truy cập: [Google AI Studio](https://aistudio.google.com/app/apikey)
+2.  Đăng nhập bằng tài khoản Gmail.
+3.  Bấm **Create API Key** → Chọn **Create in new project**.
+4.  Copy mã API hiện ra.
 
 ---
 
-## 🔑 Hướng dẫn cài đặt API Key (Quan trọng)
+## Phần 2. Cấu Hình Bot
 
-Để có thể đọc được thông tin tài sản và đặt lệnh thật, bạn cần cấp quyền API cho phần mềm.
+### Bước 2.1: Tạo File Cấu Hình
 
-### Cách lấy API trên MEXC:
-1. Đăng nhập vào trang chủ [MEXC.com](https://www.mexc.com/).
-2. Đưa chuột vào biểu tượng "Hồ sơ cá nhân" (Góc phải trên) → Chọn **Quản lý API**.
-3. Bấm **Tạo API**.
-4. Chọn các quyền: Tích chọn **Đọc dữ liệu** và **Giao dịch Futures**.
+1.  Tìm file `.env.example` trong thư mục gốc của dự án.
+2.  Tạo bản sao và đổi tên thành `.env`.
+3.  Mở file `.env` bằng Notepad (trên máy tính) hoặc Nano (trên Termux).
+4.  Dán nội dung mẫu dưới đây và điền thông tin của bạn:
 
-> ⚠️ **LƯU Ý BẢO MẬT:** Tuyệt đối **KHÔNG** tích chọn quyền **Rút tiền (Withdraw)** để đảm bảo an toàn 100% cho tài sản.
-
-5. Tạo thành công, MEXC sẽ cấp cho bạn 2 mã: `API Key` và `Secret Key`. Copy cả hai.
-
-### Cách nhập vào phần mềm:
-
-**Chế độ Desktop (giao diện):**
-1. Chuyển sang tab **Cài đặt (Settings)** (biểu tượng bánh răng).
-2. Dán `API Key` và `Secret Key`.
-3. Bấm Lưu. Khi hiển thị **API Connected** màu xanh lá là đã sẵn sàng.
-
-**Chế độ Headless (VPS):**
-1. Thêm vào file `.env`:
 ```env
-MEXC_API_KEY=mã_api_key_của_bạn
-MEXC_SECRET_KEY=mã_secret_key_của_bạn
+# ========== THÔNG SỐ CƠ BẢN ==========
+# simulation = chạy giả (không mất tiền) | live = tiền thật
+BOT_MODE=simulation
+
+# Các đồng coin cách nhau bằng dấu phẩy
+BOT_SYMBOLS=BTC,ETH,SOL
+
+# ========== QUẢN LÝ RỦI RO ==========
+# % độ tin cậy tối thiểu để bot vào lệnh (70 = an toàn)
+BOT_MIN_CONFIDENCE=70
+
+# % vốn dùng cho mỗi lệnh
+BOT_RISK_PERCENT_PER_TRADE=1
+
+# Số lệnh mở cùng lúc tối đa
+BOT_MAX_CONCURRENT_ORDERS=3
+
+# Lỗ bao nhiêu USDT thì bot tự dừng trong ngày
+BOT_DAILY_LOSS_LIMIT=50
+
+# Bật lọc tin tức thị trường? (true/false)
+BOT_NEWS_FILTER=true
+
+# Giờ nghỉ (UTC), VD: 2-6 tức là nghỉ từ 9h-1h chiều VN
+BOT_QUIET_HOURS_UTC=2-6
+
+# ========== API CỦA BẠN ==========
+MEXC_API_KEY=dán_access_key_vào_đây
+MEXC_SECRET_KEY=dán_secret_key_vào_đây
+
+# AI dùng để phân tích (Gemini khuyên dùng)
+GEMINI_API_KEY=dán_gemini_key_vào_đây
+AI_PREFERRED_PROVIDER=gemini
 ```
 
+*Trên Termux, sau khi dùng lệnh `nano .env`:*
+- Nhấn **Ctrl + O** để lưu, **Enter** xác nhận, **Ctrl + X** để thoát.
+
 ---
 
-## 🚀 Hướng dẫn sử dụng
+## Phần 3. Cách Chạy Bot Trên Máy Tính (Windows/Mac/Linux)
 
-### A. Chế độ Desktop (Giao diện)
+### Cách A: Chạy Có Giao Diện (Desktop Mode)
 
-#### Chạy
+Dành cho người muốn nhìn biểu đồ, tin tức và tự bấm nút đặt lệnh.
+
 ```bash
+# Cài đặt thư viện (chỉ chạy một lần)
+npm install
+
+# Chạy phần mềm
 npm run dev
 ```
 
-#### Đi lệnh theo gợi ý AI
-1. Truy cập tab **AI Signals** (biểu tượng hình bộ não).
-2. Theo dõi các tín hiệu. Chọn đồng coin bạn muốn.
-3. Đọc phần **Lý do (Reasons)** để hiểu tại sao AI khuyên mua/bán.
-4. Nếu đồng ý, bấm **Đặt lệnh theo tín hiệu này**.
-5. Kiểm tra lại khối lượng, đòn bẩy → Bấm **Mở vị thế**.
+Khi phần mềm mở ra:
+- Vào tab **AI Signals** để xem tín hiệu AI khuyên mua/bán.
+- Nếu đồng ý, bấm **Mở Vị Thế** để đặt lệnh.
 
----
+### Cách B: Chạy Ngầm Tự Động (Headless Mode)
 
-### B. Chế độ Headless (Bot VPS)
+Dành cho người muốn bot tự chạy 24/7 mà không cần mở cửa sổ giao diện.
 
-#### Bước 1: Cấu hình
-Tạo file `.env` trong thư mục gốc:
-```env
-BOT_MODE=simulation              # simulation = thử nghiệm, live = thật
-BOT_AUTO_START=true
-BOT_SYMBOLS=BTC,ETH,SOL
-BOT_MIN_CONFIDENCE=70
-BOT_RISK_PERCENT_PER_TRADE=1
-BOT_MAX_CONCURRENT_ORDERS=3
-BOT_DAILY_LOSS_LIMIT=50
-BOT_API_PORT=3000
-
-MEXC_API_KEY=your_api_key
-MEXC_SECRET_KEY=your_secret_key
-
-GEMINI_API_KEY=your_gemini_key
-```
-
-#### Bước 2: Build và chạy
 ```bash
+# Cài đặt thư viện
+npm install
+
+# Build bot
 npm run build:bot
-npm run start:bot
+
+# Chạy bot
+node dist-bot/bot.js
 ```
 
-Bot sẽ hiển thị:
+Nếu thành công, màn hình sẽ hiện:
+
 ```
 ┌───────────────────────────────────────────────────────┐
 │  🤖 MEXC Pro Futures Bot v2 — REST API                │
@@ -122,83 +128,156 @@ Bot sẽ hiển thị:
 └───────────────────────────────────────────────────────┘
 ```
 
-#### Bước 3: Điều khiển từ xa qua REST API
+---
+
+## Phần 4. Cách Chạy Bot Trên Điện Thoại Android (Termux)
+
+Máy tính bạn có thể tắt, nhưng điện thoại thì có thể mang theo. Đây là cách biến điện thoại thành máy chủ bot.
+
+### Bước 4.1: Cài Đặt Termux
+
+1.  **Gỡ Termux** nếu đã cài từ Play Store (bản cũ).
+2.  Tải bản mới từ: [https://f-droid.org/repo/com.termux_118.apk](https://f-droid.org/repo/com.termux_118.apk)
+3.  Cài đặt file APK.
+
+### Bước 4.2: Cấp Quyền Chạy Ngầm (Quan trọng)
+
+Để bot không bị Android tắt khi tắt màn hình:
+
+1.  Mở Termux, vuốt thanh thông báo xuống.
+2.  Nhấn vào dòng **"Acquiring Wake Lock"** để giữ cho ứng dụng hoạt động.
+3.  Vào **Cài đặt → Ứng dụng → Termux → Pin**.
+4.  Chọn **Không tối ưu hóa**.
+
+### Bước 4.3: Cài Đặt Công Cụ
+
+Mở Termux và chạy từng lệnh:
+
 ```bash
-# Kiểm tra bot còn sống không
-curl http://localhost:3000/api/health
+# Cập nhật hệ thống
+pkg update && pkg upgrade -y
+# (Nhấn 'y' nếu được hỏi)
 
-# Xem trạng thái đầy đủ (balance, PnL, circuit breakers...)
-curl http://localhost:3000/api/status
-
-# Dừng bot
-curl -X POST http://localhost:3000/api/stop
-
-# Bật lại bot
-curl -X POST http://localhost:3000/api/start
-
-# Xem 20 lệnh gần nhất
-curl "http://localhost:3000/api/logs?limit=20"
-
-# Xem lịch sử lệnh
-curl "http://localhost:3000/api/orders?limit=20"
-
-# Reset Circuit Breaker (khi TimesFM đã hồi lại)
-curl -X POST http://localhost:3000/api/circuit-breaker/reset \
-  -H "Content-Type: application/json" \
-  -d '{"name":"timesfm"}'
+# Cài Node.js và Git
+pkg install nodejs-lts git -y
 ```
 
-#### Bước 4: Chạy với PM2 (khuyến nghị)
+### Bước 4.4: Tải Code Về Điện Thoại
+
+**Cách A: Clone từ GitHub (Nếu đã đẩy code lên)**
+```bash
+git clone https://github.com/HoangThiLong/auto-trading-web.git
+cd auto-trading-web
+```
+
+**Cách B: Copy thủ công (Nếu chưa push lên GitHub)**
+1.  Nén thư mục dự án thành `.zip` trên máy tính.
+2.  Gửi file qua Zalo/Telegram/Google Drive.
+3.  Trên Termux, vào thư mục chứa file (thường là `/sdcard/download`):
+    ```bash
+    cd /sdcard/download
+    unzip ten_file.zip -d $HOME
+    cd ten_folder
+    ```
+
+### Bước 4.5: Cài Đặt & Chạy Bot
+
+```bash
+# Cài thư viện
+npm install
+
+# Build bot (biên dịch code)
+npm run build:bot
+
+# Chạy bot
+node dist-bot/bot.js
+```
+
+**Để chạy ổn định 24/7, cài đặt PM2:**
+
 ```bash
 npm install -g pm2
-pm2 start ecosystem.config.js
+
+# Chạy bot bằng PM2 (tự khởi động lại khi bị lỗi)
+pm2 start dist-bot/bot.js --name "mexc-bot"
+
+# Lưu cấu hình PM2
 pm2 save
-pm2 startup     # Tự khởi động khi VPS reboot
 ```
 
-Các lệnh PM2 hữu ích:
+**Các lệnh PM2 cần nhớ:**
+| Lệnh | Công dụng |
+|------|-----------|
+| `pm2 status` | Xem bot còn chạy không |
+| `pm2 logs mexc-bot` | Xem log giao dịch realtime |
+| `pm2 restart mexc-bot` | Khởi động lại bot |
+| `pm2 stop mexc-bot` | Dừng bot |
+
+### Bước 4.6: Truy Cập Bot Từ Trình Duyệt
+
+**Trên điện thoại:**
+Mở Chrome và gõ: `http://localhost:3000/api/status`
+
+**Từ máy tính (cùng Wi-Fi):**
+1.  Trong Termux, gõ `ifconfig`, tìm địa chỉ `192.168.x.x`.
+2.  Trên máy tính, gõ: `http://192.168.x.x:3000/api/status`
+
+---
+
+## Phần 5. Kiểm Tra Bot Khi Chạy Ngầm
+
+Khi bot chạy ở chế độ Headless, nó mở cổng `3000`. Bạn có thể kiểm tra bằng trình duyệt hoặc lệnh curl:
+
+| Mục đích | Địa chỉ / Lệnh |
+|----------|----------------|
+| Xem tình hình tiền & lãi/lỗ | [http://localhost:3000/api/status](http://localhost:3000/api/status) |
+| Xem lịch sử lệnh | [http://localhost:3000/api/orders?limit=10](http://localhost:3000/api/orders?limit=10) |
+| Xem log giao dịch | [http://localhost:3000/api/logs?limit=10](http://localhost:3000/api/logs?limit=10) |
+| Kiểm tra bot còn sống | `curl http://localhost:3000/api/health` |
+| **Dừng bot khẩn cấp** | `curl -X POST http://localhost:3000/api/stop` |
+| Bật bot lại | `curl -X POST http://localhost:3000/api/start` |
+
+---
+
+## Phần 6. Câu Hỏi Thường Gặp (Q&A)
+
+**H: Bot không chạy, toàn báo lỗi đỏ là sao?**
+A: Kiểm tra lại file `.env` đã điền đủ GEMINI_API_KEY chưa. Nếu để trống, bot sẽ không có AI để phân tích và báo lỗi ngay từ đầu.
+
+**H: Tại sao bot không chịu đặt lệnh dù thị trường lên xuống?**
+A: Bot hoạt động theo nguyên tắc "Debate" - tức là 4 AI phải đồng thuận. Nếu đang trong giờ nghỉ (Quiet Hours), hoặc tin tức thị trường xấu (News Filter), hoặc độ tin cậy chưa đạt mức tối thiểu (MIN_CONFIDENCE), bot sẽ không vào lệnh. Đây là cơ chế an toàn.
+
+**H: Điện thoại bị tắt màn hình liệu bot có chết không?**
+A: Nếu bạn đã cấp quyền Wake Lock và cài PM2, bot sẽ tiếp tục chạy. Nếu điện thoại tắt hẳn, khi bật lại và gõ lệnh `pm2 start` hoặc `node dist-bot/bot.js`, bot sẽ tự động load lại toàn bộ trạng thái từ cơ sở dữ liệu SQLite (`logs/bot.db`) - các lệnh đang mở sẽ được nhớ lại.
+
+**H: Tôi muốn chạy thử (Simulation) trước khi dùng tiền thật?**
+A: Đảm bảo trong file `.env` có dòng `BOT_MODE=simulation`. Bot sẽ dùng 10,000 USDT ảo để giao dịch. Khi thấy ổn định, đổi thành `BOT_MODE=live`.
+
+**H: API Key lộ ra ngoài có nguy hiểm không?**
+A: Miễn là bạn **không cấp quyền Withdraw** (Rút tiền) khi tạo API trên MEXC, dù ai đó có lấy được API Key cũng không thể chuyển tiền ra khỏi tài khoản của bạn.
+
+---
+
+## Tóm Tắt Lệnh Quan Trọng
+
 ```bash
-pm2 status              # Trạng thái tất cả process
-pm2 logs mexc-ai-bot    # Log realtime
-pm2 restart mexc-ai-bot # Restart
-pm2 stop mexc-ai-bot    # Dừng
+# === TRÊN MÁY TÍNH ===
+npm install              # Cài thư viện
+npm run dev              # Chạy giao diện
+npm run build:bot        # Build bot ngầm
+node dist-bot/bot.js     # Chạy bot ngầm
+
+# === TRÊN TERMUX (ĐIỆN THOẠI) ===
+cd auto-trading-web     # Vào thư mục
+npm run build:bot       # Build bot
+node dist-bot/bot.js     # Chạy bot thường
+
+# Hoặc dùng PM2 để chạy ổn định:
+pm2 start dist-bot/bot.js --name "mexc-bot"
+pm2 status              # Xem trạng thái
+pm2 logs mexc-bot      # Xem log
+
+# === KIỂM TRA ===
+curl http://localhost:3000/api/status   # Xem trạng thái
+curl -X POST http://localhost:3000/api/stop   # Dừng bot
 ```
-
----
-
-## 🔒 Quản lý rủi ro
-
-1. **Luôn chạy `simulation` trước**: Đặt `BOT_MODE=simulation` để kiểm tra chiến lược trước khi dùng tiền thật.
-2. **Giới hạn lỗ ngày**: Đặt `BOT_DAILY_LOSS_LIMIT=50` để bot tự dừng khi lỗ vượt ngưỡng.
-3. **Kill Switch**: Bot sẽ tự dừng khi `autoTradeRunning = false` hoặc `autoTradeMode = off`.
-4. **Giờ nghỉ**: Đặt `BOT_QUIET_HOURS_UTC=2-6` để bot không giao dịch trong giờ ít thanh khoản.
-5. **Lọc tin tức**: `BOT_NEWS_FILTER=true` sẽ bỏ qua lệnh khi thị trường có tin xấu.
-6. **Circuit Breaker**: Khi dịch vụ bên ngoài lỗi, bot tự động làm việc với những gì còn lại (không sập toàn bộ).
-
----
-
-## ❓ Câu hỏi thường gặp
-
-**H: Bot có tự rút tiền từ tài khoản của tôi được không?**
-
-A: **Không**. Nếu bạn không cấp quyền Withdraw cho API Key, bot chỉ có thể đọc dữ liệu và đặt lệnh, không thể chuyển tiền ra ngoài.
-
-**H: Bot hết bao nhiêu RAM?**
-
-A: Khoảng 100–200MB. PM2 config giới hạn tối đa 250MB.
-
-**H: Dữ liệu có mất khi restart không?**
-
-A: **Không**. Từ Phase 2, toàn bộ dữ liệu được lưu vào SQLite (`logs/bot.db`). Khi bot khởi động lại, nó sẽ tự động load lại các lệnh đang mở và bài học giao dịch.
-
-**H: TimesFM sập thì sao?**
-
-A: Circuit Breaker sẽ tự động kích hoạt. Bot tiếp tục chạy dựa trên AI Debate + Phân tích kỹ thuật, không cần TimesFM.
-
-**H: Mạng VPS chập chờn thì sao?**
-
-A: WebSocket sẽ tự động kết nối lại với Exponential Backoff (1s → 2s → 4s... max 30s), tránh vấn đề spam kết nối.
-
----
-
-Chúc bạn có một trải nghiệm giao dịch thuận lợi và an toàn! 🚀
