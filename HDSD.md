@@ -31,6 +31,21 @@ Bot cần AI để phân tích và đưa ra quyết định giao dịch.
 3.  Bấm **Create API Key** → Chọn **Create in new project**.
 4.  Copy mã API hiện ra.
 
+### Bước 1.3: Tạo Bot Telegram (Không Bắt Buộc)
+
+Nếu bạn muốn nhận thông báo tự động và điều khiển bot từ xa, hãy cấu hình Telegram Bot.
+
+1.  Mở ứng dụng Telegram, tìm kiếm **@BotFather**.
+2.  Gõ lệnh `/newbot` để tạo bot mới.
+3.  Đặt tên cho bot (ví dụ: `MEXC Trading Bot`).
+4.  BotFather sẽ trả về `HTTP API Token` → Copy và lưu lại (đây là `TELEGRAM_BOT_TOKEN`).
+5.  Tìm kiếm bot vừa tạo và gửi tin nhắn bất kỳ (ví dụ: `/start`).
+6.  Truy cập: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+    (Thay `<TOKEN>` bằng token ở bước 4).
+7.  Trong kết quả JSON, tìm trường `"chat":{"id": ...` → Copy số ID đó (đây là `TELEGRAM_ADMIN_CHAT_ID`).
+
+> **Lưu ý bảo mật:** Chỉ có Chat ID được cấu hình trong `.env` mới có thể gửi lệnh điều khiển bot. Tin nhắn từ người lạ sẽ bị bỏ qua.
+
 ---
 
 ## Phần 2. Cấu Hình Bot
@@ -76,6 +91,10 @@ MEXC_SECRET_KEY=dán_secret_key_vào_đây
 # AI dùng để phân tích (Gemini khuyên dùng)
 GEMINI_API_KEY=dán_gemini_key_vào_đây
 AI_PREFERRED_PROVIDER=gemini
+
+# ========== TELEGRAM BOT (Tùy Chọn) ==========
+TELEGRAM_BOT_TOKEN=dán_token_bot_vào_đây
+TELEGRAM_ADMIN_CHAT_ID=dán_chat_id_của_bạn_vào_đây
 ```
 
 *Trên Termux, sau khi dùng lệnh `nano .env`:*
@@ -241,6 +260,42 @@ Khi bot chạy ở chế độ Headless, nó mở cổng `3000`. Bạn có thể
 | Kiểm tra bot còn sống | `curl http://localhost:3000/api/health` |
 | **Dừng bot khẩn cấp** | `curl -X POST http://localhost:3000/api/stop` |
 | Bật bot lại | `curl -X POST http://localhost:3000/api/start` |
+
+### Phần 5.1: Kết Nối Telegram Với Bot
+
+Sau khi đã cấu hình `TELEGRAM_BOT_TOKEN` và `TELEGRAM_ADMIN_CHAT_ID` trong `.env`:
+
+1.  Build lại bot:
+    ```bash
+    npm run build:bot
+    ```
+2.  Chạy bot:
+    ```bash
+    node dist-bot/bot.js
+    ```
+3.  Mở Telegram, vào đúng bot bạn đã tạo ở Bước 1.3.
+4.  Trong chính tài khoản Telegram có Chat ID đã khai báo, gửi lệnh `/status`.
+5.  Nếu bot trả trạng thái hệ thống, kết nối Telegram đã thành công.
+
+> **Quan trọng:** Chỉ Chat ID trùng với `TELEGRAM_ADMIN_CHAT_ID` mới điều khiển được bot. Chat ID lạ sẽ bị từ chối im lặng.
+
+### Phần 5.2: Cách Sử Dụng Telegram Để Điều Khiển Bot
+
+| Lệnh Telegram | Công dụng |
+|---------------|-----------|
+| `/status` | Xem nhanh trạng thái bot (mode, running, balance, PnL, thống kê lệnh) |
+| `/startbot` | Bật bot giao dịch tự động từ xa |
+| `/stopbot` | Dừng bot giao dịch tự động từ xa |
+
+### Phần 5.3: Các Cảnh Báo Telegram Bạn Sẽ Nhận
+
+Khi Telegram đã kết nối, bot sẽ gửi cảnh báo theo sự kiện:
+
+- `ORDER_OPENED`: Có lệnh mới được mở.
+- `TP_HIT`: Lệnh chạm Take Profit.
+- `SL_HIT`: Lệnh chạm Stop Loss.
+- `DAILY_LOSS_LIMIT`: Chạm mức lỗ ngày, bot tự dừng để bảo vệ vốn.
+- Trạng thái Circuit Breaker đổi (`CLOSED` ↔ `HALF_OPEN` ↔ `OPEN`).
 
 ---
 

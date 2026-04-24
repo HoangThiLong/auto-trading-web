@@ -11,17 +11,20 @@ import { readRuntimeEnv } from './runtimeEnv';
  * Passphrase priority:
  *   import.meta.env.VITE_APP_ENCRYPTION_KEY  (Vite/Electron renderer)
  *   > process.env.ENCRYPTION_KEY             (Node.js CLI / bot.ts)
- *   > hardcoded fallback
+ *
+ * NOTE: No hardcoded fallback - encryption requires explicit environment variable
  */
-
-const HARDCODED_FALLBACK_KEY = 'mxc-pro-v2::f9a3b7c1d5e2::default-aes-key';
 
 function resolvePassphrase(): string {
   const envKey =
     readRuntimeEnv('VITE_APP_ENCRYPTION_KEY') ||
     readRuntimeEnv('ENCRYPTION_KEY');
 
-  return envKey || HARDCODED_FALLBACK_KEY;
+  if (!envKey) {
+    throw new Error('ENCRYPTION_KEY environment variable is required for credential encryption');
+  }
+
+  return envKey;
 }
 
 /**

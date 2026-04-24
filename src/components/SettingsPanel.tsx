@@ -9,6 +9,10 @@ import {
   BarChart2,
   Sparkles,
   CheckCircle2,
+  XCircle,
+  Wifi,
+  WifiOff,
+  MessageCircle,
 } from 'lucide-react';
 import { AI_PROVIDERS } from '../types';
 import { useSettingsPanelState } from '../store/hooks';
@@ -21,7 +25,18 @@ export default function SettingsPanel() {
     aiCredentials,
     autoTradeMode,
     autoTradeConfig,
+    credentials,
+    isApiConnected,
+    telegramCredentials,
+    mexcNetwork,
   } = useSettingsPanelState();
+
+  const maskKey = (key: string | undefined): string => {
+    if (!key || key.length < 8) return '••••••••';
+    return `${key.slice(0, 4)}...${key.slice(-4)}`;
+  };
+
+  const hasApiKey = !!(credentials?.apiKey && credentials?.secretKey);
 
   const activeAiProviders = AI_PROVIDERS.filter((provider) => aiCredentials?.[provider.id]);
   const hasAnyProviders = activeAiProviders.length > 0;
@@ -130,6 +145,100 @@ export default function SettingsPanel() {
             Mở file <strong>HDSD.md</strong> để xem luồng thiết lập, checklist an toàn và best practices trước khi trade live.
           </p>
         </div>
+      </section>
+
+      {/* ── MEXC API Status ── */}
+      <section className="coinbase-surface rounded-2xl p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <Wifi className="h-4 w-4 text-[var(--color-warning)]" />
+            MEXC API Status
+          </div>
+          <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+            hasApiKey && isApiConnected
+              ? 'border-[rgba(0,230,138,0.42)] bg-[var(--color-success-dim)] text-[var(--color-success)]'
+              : hasApiKey
+              ? 'border-[rgba(255,184,46,0.42)] bg-[var(--color-warning-dim)] text-[var(--color-warning)]'
+              : 'border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)]'
+          }`}>
+            {hasApiKey && isApiConnected ? <CheckCircle2 className="h-3 w-3" /> : hasApiKey ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            {hasApiKey && isApiConnected ? 'Verified' : hasApiKey ? 'Saved' : 'Not configured'}
+          </span>
+        </div>
+
+        {hasApiKey ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">API Key</span>
+              <span className="font-mono font-bold text-[var(--text-main)]">{maskKey(credentials?.apiKey)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">Secret Key</span>
+              <span className="font-mono font-bold text-[var(--text-main)]">{maskKey(credentials?.secretKey)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">Network</span>
+              <span className={`font-bold ${mexcNetwork === 'live' ? 'text-[var(--color-success)]' : 'text-[var(--color-brand)]'}`}>
+                {mexcNetwork === 'live' ? '🟢 Live' : '🧪 Demo'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">Connection</span>
+              <span className={`font-bold ${isApiConnected ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}>
+                {isApiConnected ? '✅ Verified' : '⚠️ Not verified'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setApiModalOpen(true)}
+            className="coinbase-pill-btn w-full border-[rgba(255,184,46,0.45)] bg-[var(--color-warning-dim)] py-2.5 text-xs font-extrabold uppercase tracking-[0.08em] text-[var(--color-warning)] hover:bg-[rgba(255,184,46,0.2)]"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Key className="h-3.5 w-3.5" /> Thêm MEXC API Key
+            </span>
+          </button>
+        )}
+      </section>
+
+      {/* ── Telegram Status ── */}
+      <section className="coinbase-surface rounded-2xl p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <MessageCircle className="h-4 w-4 text-[var(--color-brand)]" />
+            Telegram Notifications
+          </div>
+          <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+            telegramCredentials?.botToken && telegramCredentials?.adminChatId
+              ? 'border-[rgba(0,230,138,0.42)] bg-[var(--color-success-dim)] text-[var(--color-success)]'
+              : 'border-[var(--border)] bg-[var(--bg-main)] text-[var(--text-muted)]'
+          }`}>
+            {telegramCredentials?.botToken ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+            {telegramCredentials?.botToken ? 'Active' : 'Not configured'}
+          </span>
+        </div>
+
+        {telegramCredentials?.botToken ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">Bot Token</span>
+              <span className="font-mono font-bold text-[var(--text-main)]">{maskKey(telegramCredentials.botToken)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--bg-main)] px-3 py-2.5 text-sm">
+              <span className="text-[var(--text-muted)]">Chat ID</span>
+              <span className="font-mono font-bold text-[var(--text-main)]">{telegramCredentials.adminChatId}</span>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setApiModalOpen(true)}
+            className="coinbase-pill-btn w-full border-[rgba(0,82,255,0.45)] bg-[var(--color-brand-dim)] py-2.5 text-xs font-extrabold uppercase tracking-[0.08em] text-[var(--color-brand)] hover:bg-[rgba(0,82,255,0.2)]"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <MessageCircle className="h-3.5 w-3.5" /> Cấu hình Telegram
+            </span>
+          </button>
+        )}
       </section>
 
       <section className="coinbase-surface rounded-2xl p-4">

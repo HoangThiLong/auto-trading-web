@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useStore } from './store/useStore';
-import { fetchAllTickers, fetchContractInfo } from './services/mexcApi';
+import { fetchAllTickers, fetchContractInfo, connectionManager, setRuntimeMexcNetwork } from './services/mexcApi';
+import type { ConnectionMode } from './services/connectionManager';
 import CoinList from './components/CoinList';
 import TradingChart from './components/TradingChart';
 import OrderBook from './components/OrderBook';
@@ -14,6 +15,7 @@ import TickerBar from './components/TickerBar';
 import NewsFeed from './components/NewsFeed';
 import ApiKeyModal from './components/ApiKeyModal';
 import AutoTradePanel from './components/AutoTradePanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import type { CandlePoint, TradeSignal } from './types';
 import {
   BarChart2, Brain, ShoppingBag, Wallet, Settings,
@@ -69,6 +71,7 @@ export default function App() {
   const credentials = useStore(s => s.credentials);
   const isApiConnected = useStore(s => s.isApiConnected);
   const aiCredentials = useStore(s => s.aiCredentials);
+  const mexcNetwork = useStore(s => s.mexcNetwork);
   const selectedSymbol = useStore(s => s.selectedSymbol);
   const setApiModalOpen = useStore(s => s.setApiModalOpen);
   const setAutoTradePanelOpen = useStore(s => s.setAutoTradePanelOpen);
@@ -76,6 +79,12 @@ export default function App() {
   const currentSignal = useStore(s => s.signals[s.selectedSymbol]);
   const marketSentiment = useStore(s => s.marketSentiment);
   const autoTradeRunning = useStore(s => s.autoTradeRunning);
+
+  // Tracks whether public market data endpoints are reachable (no API key needed)
+  const [isMarketDataLive, setIsMarketDataLive] = useState(false);
+  // Tracks connection mode: DIRECT = normal, RELAY = routed through proxy
+  const [connMode, setConnMode] = useState<ConnectionMode>('DIRECT');
+  const autoTradeDaemonRef = useRef<{ start: () => void; stop: () => void } | null>(null);
 
   // Resume/stop Auto Trade Daemon based on persisted runtime state
   useEffect(() => {
@@ -85,8 +94,9 @@ export default function App() {
       .then(({ autoTradeDaemon }) => {
         if (disposed) return;
 
+        autoTradeDaemonRef.current = autoTradeDaemon;
+
         if (autoTradeMode !== 'off' && autoTradeRunning) {
-          console.log('🔄 Tự động khôi phục Auto-Trade từ phiên trước...');
           autoTradeDaemon.start();
         } else {
           autoTradeDaemon.stop();
@@ -102,6 +112,31 @@ export default function App() {
       disposed = true;
     };
   }, [autoTradeMode, autoTradeRunning]);
+
+  // Ensure bot and local orders are stopped when app window is closed
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const shutdownAutoTradeSafely = () => {
+      autoTradeDaemonRef.current?.stop();
+
+      useStore.setState((state) => ({
+        autoTradeRunning: false,
+        autoTradeMode: 'off',
+        pendingOrders: state.pendingOrders.map((order) =>
+          order.status === 'PENDING' ? { ...order, status: 'CANCELLED' } : order,
+        ),
+        autoTradeLogs: state.autoTradeLogs.map((log) =>
+          log.status === 'OPENED' ? { ...log, status: 'CLOSED' } : log,
+        ),
+      }));
+    };
+
+    window.addEventListener('beforeunload', shutdownAutoTradeSafely);
+    return () => {
+      window.removeEventListener('beforeunload', shutdownAutoTradeSafely);
+    };
+  }, []);
 
   const [candles, setCandles] = useState<CandlePoint[]>([]);
   const [prefillSignal, setPrefillSignal] = useState<TradeSignal | null>(null);
@@ -121,7 +156,27 @@ export default function App() {
   const ordersMainSplitRef = useRef<HTMLDivElement>(null);
   const ordersChartSplitRef = useRef<HTMLDivElement>(null);
 
-  const setIsApiConnected = useStore(s => s.setIsApiConnected);
+
+  // Derive the real API key connection status:
+  // isApiConnected should ONLY be true when a private API key has been validated.
+  // It must NOT be set by public endpoints like fetchContractInfo / fetchAllTickers.
+  const hasApiKey = !!(credentials?.apiKey && credentials?.secretKey);
+
+  // Keep runtime MEXC network in sync with persisted store (important on app startup).
+  useEffect(() => {
+    setRuntimeMexcNetwork(mexcNetwork);
+  }, [mexcNetwork]);
+
+  // Subscribe to ConnectionManager mode changes (DIRECT <-> RELAY)
+  useEffect(() => {
+    const unsubscribe = connectionManager.onModeChange((mode, reason) => {
+      setConnMode(mode);
+      console.log(`[App] Connection mode: ${mode} (${reason})`);
+    });
+    // Sync initial state
+    setConnMode(connectionManager.getMode());
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -190,6 +245,8 @@ export default function App() {
   }, [dragging]);
 
   // Init contract metadata once on mount
+  // NOTE: fetchContractInfo is a PUBLIC endpoint — does NOT require API keys.
+  // We must NOT set isApiConnected here; only track market data availability.
   useEffect(() => {
     let cancelled = false;
 
@@ -199,12 +256,11 @@ export default function App() {
         if (cancelled) return;
         if (contracts.length) {
           setContracts(contracts);
-          setIsApiConnected(true);
+          setIsMarketDataLive(true);
         }
       } catch (err) {
         if (!cancelled) {
           console.error('Contract init error:', err);
-          setIsApiConnected(false);
         }
       }
     };
@@ -214,25 +270,38 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [setContracts, setIsApiConnected]);
+  }, [setContracts]);
 
   // Poll ticker snapshot
+  // NOTE: fetchAllTickers is a PUBLIC endpoint — does NOT require API keys.
+  // We must NOT set isApiConnected here; only track market data availability.
   useEffect(() => {
     let cancelled = false;
+    let isFetching = false;
 
     const loadTickers = async () => {
+      // Skip if previous request is still in-flight (prevents pile-up in relay mode)
+      if (isFetching) {
+        console.warn('[App] Skipping ticker poll — previous request still pending');
+        return;
+      }
+
+      isFetching = true;
       try {
         const tickers = await fetchAllTickers();
         if (cancelled) return;
         if (tickers.length) {
           setTickers(tickers);
-          setIsApiConnected(true);
+          setIsMarketDataLive(true);
         }
       } catch (err) {
         if (!cancelled) {
-          console.error('Ticker snapshot error:', err);
-          setIsApiConnected(false);
+          // Use warn instead of error to avoid red console spam during relay failures
+          console.warn('[App] Ticker snapshot error:', err);
+          setIsMarketDataLive(false);
         }
+      } finally {
+        isFetching = false;
       }
     };
 
@@ -243,7 +312,7 @@ export default function App() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [setTickers, setIsApiConnected]);
+  }, [setTickers]);
 
   // WebSocket for active ticker real-time updates
   useEffect(() => {
@@ -269,8 +338,9 @@ export default function App() {
 
           if (msg.data && (msg.data.lastPrice || msg.data.p)) {
             lastUpdate = now;
-            const updates: any = {};
-            updates.lastPrice = Number(msg.data.lastPrice || msg.data.p);
+            const updates: Partial<import('./types').ContractTicker> = {
+              lastPrice: Number(msg.data.lastPrice || msg.data.p),
+            };
             if (msg.data.riseFallRate !== undefined) updates.riseFallRate = Number(msg.data.riseFallRate);
             if (msg.data.fairPrice !== undefined) updates.fairPrice = Number(msg.data.fairPrice);
             if (msg.data.indexPrice !== undefined) updates.indexPrice = Number(msg.data.indexPrice);
@@ -322,8 +392,9 @@ export default function App() {
 
 
   return (
-    <div className="coinbase-shell flex h-screen flex-col overflow-hidden text-[var(--text-main)] select-none">
-      <Toaster position="top-right" toastOptions={{
+    <ErrorBoundary>
+      <div className="coinbase-shell flex h-screen flex-col overflow-hidden text-[var(--text-main)] select-none">
+        <Toaster position="top-right" toastOptions={{
         style: {
           background: 'var(--bg-card)',
           color: 'var(--text-main)',
@@ -392,17 +463,48 @@ export default function App() {
 
         {/* Right controls */}
         <div className="ml-auto flex shrink-0 items-center gap-2.5 pl-3">
-          {/* API Status button */}
+          {/* Network Status — Market data + connection mode */}
+          <div className={`hidden xl:flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${ 
+            connMode === 'RELAY'
+              ? 'border-[rgba(255,184,46,0.35)] text-[var(--color-warning)] bg-[var(--color-warning-dim)]'
+              : isMarketDataLive
+              ? 'border-[rgba(0,230,138,0.25)] text-[var(--color-success)] bg-[var(--color-success-dim)]'
+              : 'border-[rgba(255,77,106,0.25)] text-[var(--color-danger)] bg-[var(--color-danger-dim)]'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              connMode === 'RELAY'
+                ? 'bg-[var(--color-warning)] animate-pulse'
+                : isMarketDataLive ? 'bg-[var(--color-success)] animate-pulse' : 'bg-[var(--color-danger)]'
+            }`} />
+            {connMode === 'RELAY' ? 'Relay Mode' : isMarketDataLive ? 'Market Live' : 'Market Offline'}
+          </div>
+
+          {/* Force Direct button — only visible when stuck in RELAY mode */}
+          {connMode === 'RELAY' && (
+            <button
+              onClick={() => {
+                connectionManager.forceMode('DIRECT', 'user forced via UI');
+                setConnMode('DIRECT');
+              }}
+              className="hidden xl:flex items-center gap-1.5 rounded-full border border-[rgba(0,82,255,0.4)] bg-[var(--color-brand-dim)] px-3 py-2 text-xs font-bold text-[var(--color-brand)] transition-all hover:bg-[var(--color-brand)] hover:text-white"
+              title="Chuyển sang kết nối trực tiếp (không qua proxy)"
+            >
+              <Wifi className="w-3 h-3" />
+              Force Direct
+            </button>
+          )}
+
+          {/* API Key Status button */}
           <button onClick={() => setApiModalOpen(true)}
             className={`coinbase-pill-btn hidden md:flex items-center gap-2 text-sm px-4 py-2.5 font-semibold ${
-              isApiConnected
+              hasApiKey && isApiConnected
                 ? 'bg-[var(--color-success-dim)] border-[rgba(0,230,138,0.35)] text-[var(--color-success)]'
-                : credentials
+                : hasApiKey
                 ? 'bg-[var(--color-warning-dim)] border-[rgba(255,184,46,0.35)] text-[var(--color-warning)]'
                 : 'bg-[var(--bg-surface-soft)] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--color-brand-hover)] hover:text-[var(--text-secondary)]'
             }`}>
             <Key className="w-4 h-4" />
-            {isApiConnected ? 'Connected' : credentials ? 'API Saved' : 'API Keys'}
+            {hasApiKey && isApiConnected ? 'API Verified' : hasApiKey ? 'API Saved' : 'API Keys'}
             {hasAiKey && <span className="w-2 h-2 rounded-full bg-[var(--color-cyan)] animate-glow" />}
           </button>
 
@@ -422,14 +524,16 @@ export default function App() {
             {autoTradeMode !== 'off' && <span className="w-2 h-2 rounded-full bg-current animate-pulse" />}
           </button>
 
-          {/* Connection */}
+          {/* Connection status — shows API key status clearly */}
           <div className={`hidden lg:flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium ${
-            credentials
-              ? isApiConnected ? 'border-[rgba(0,230,138,0.3)] text-[var(--color-success)] bg-[var(--color-success-dim)]' : 'border-[rgba(255,184,46,0.3)] text-[var(--color-warning)] bg-[var(--color-warning-dim)]'
+            hasApiKey
+              ? isApiConnected
+                ? 'border-[rgba(0,230,138,0.3)] text-[var(--color-success)] bg-[var(--color-success-dim)]'
+                : 'border-[rgba(255,184,46,0.3)] text-[var(--color-warning)] bg-[var(--color-warning-dim)]'
               : 'border-[var(--border)] text-[var(--text-muted)] bg-[var(--bg-surface-soft)]'
           }`}>
-            {credentials ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-            {credentials ? (isApiConnected ? 'API Connected' : 'API Status') : 'No API Key'}
+            {hasApiKey ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+            {hasApiKey ? (isApiConnected ? 'API Connected' : 'API Not Verified') : 'No API Key'}
           </div>
 
           {/* Mobile menu */}
@@ -615,5 +719,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

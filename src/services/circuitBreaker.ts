@@ -42,6 +42,10 @@ export class CircuitBreaker {
     };
   }
 
+  setOnStateChange(handler?: CircuitBreakerConfig['onStateChange']): void {
+    this.config.onStateChange = handler;
+  }
+
   // ─── State Queries ───────────────────────────────────────────────
 
   getName(): string {

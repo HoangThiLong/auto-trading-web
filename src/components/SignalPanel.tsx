@@ -180,14 +180,32 @@ export default function SignalPanel({ candles, onPlaceOrder }: Props) {
             sig.aiAnalysis = aiResult.analysis;
             sig.aiProvider = providerInfo?.name || aiResult.provider;
             sig.confidence = Math.round((sig.confidence + aiResult.confidence) / 2);
+            sig.reasons = [`🤖 AI Provider: ${sig.aiProvider}`, ...sig.reasons];
             if (aiResult.riskWarning) {
               sig.reasons.push(`⚠️ AI: ${aiResult.riskWarning}`);
             }
             setCurrentAiProvider(sig.aiProvider);
+          } else {
+            sig.reasons = ['⚠️ AI fallback: dùng tín hiệu local', ...sig.reasons];
+            setCurrentAiProvider('local');
           }
         } finally {
           setAiLoading(false);
         }
+      } else {
+        setCurrentAiProvider('local');
+      }
+
+      if (!sig.aiProvider) {
+        sig.aiProvider = 'local';
+      }
+
+      if (!sig.aiAnalysis && sig.aiProvider === 'local') {
+        sig.aiAnalysis = 'Using local technical analysis only.';
+      }
+
+      if (sig.reasons.some((reason) => reason.includes('TP/SL'))) {
+        sig.reasons = ['⚠️ Một phần mức TP/SL đã được chuẩn hóa lại', ...sig.reasons];
       }
 
       setSignal(selectedSymbol, sig);

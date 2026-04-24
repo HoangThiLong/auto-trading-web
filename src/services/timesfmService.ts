@@ -13,7 +13,8 @@ const resolveTimesFmBaseUrl = (): string => {
 
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-  return isLocalhost ? 'http://127.0.0.1:8000' : '';
+  const port = readRuntimeEnv('TIMESFM_PORT') || '8010';
+  return isLocalhost ? `http://127.0.0.1:${port}` : '';
 };
 
 const TIMESFM_API_BASE_URL = resolveTimesFmBaseUrl();

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { placeOrder } from '../services/mexcApi';
+import { placeOrder, fetchAccountInfo, fetchKlines } from '../services/mexcApi';
 import type { TradeSignal, PendingOrder } from '../types';
 import toast from 'react-hot-toast';
-import { ShoppingBag, X, ExternalLink, Lock, TrendingUp, TrendingDown, Shield, CircleDollarSign } from 'lucide-react';
+import { ShoppingBag, X, ExternalLink, Lock, TrendingUp, TrendingDown, Shield, CircleDollarSign, Sparkles } from 'lucide-react';
 import { useOrderPanelState } from '../store/hooks';
+import { useStore } from '../store/useStore';
+import { generateSignal } from '../services/analysis';
+import { calcPositionSize } from '../services/capitalManager';
 
 interface Props {
   prefillSignal?: TradeSignal | null;
@@ -11,6 +14,13 @@ interface Props {
 
 export default function OrderPanel({ prefillSignal }: Props) {
   const { selectedSymbol, tickers, contracts, credentials, addOrder, pendingOrders, updateOrder } = useOrderPanelState();
+  const isApiConnected = useStore((state) => state.isApiConnected);
+  const telegramCredentials = useStore((state) => state.telegramCredentials);
+  const accountBalance = useStore((state) => state.accountBalance);
+
+  const demoBalance = useStore((state) => state.demoBalance);
+
+  const [aiSuggestionLoading, setAiSuggestionLoading] = useState(false);
 
   const ticker = tickers.find((item) => item.symbol === selectedSymbol);
   const currentPrice = ticker?.lastPrice || 0;
@@ -58,6 +68,75 @@ export default function OrderPanel({ prefillSignal }: Props) {
     }
   };
 
+  const handleAISuggest = async () => {
+    if (!selectedSymbol) {
+      toast.error('Vui lòng chọn một đồng tiền');
+      return;
+    }
+    setAiSuggestionLoading(true);
+    try {
+      // 1. Get Balance
+      let balance = demoBalance || 10000; // Default to demo if no balance
+      if (isApiConnected && credentials) {
+        const accountInfo = await fetchAccountInfo(credentials.apiKey, credentials.secretKey);
+        if (accountInfo && accountInfo.length > 0) {
+          balance = accountInfo.reduce((sum: number, asset: any) => sum + (parseFloat(asset.availableBalance) || 0), 0);
+        } else {
+          balance = accountBalance || demoBalance || 10000;
+        }
+      } else {
+        balance = demoBalance || 10000;
+      }
+
+      // 2. Fetch Market Data
+      const klines = await fetchKlines(selectedSymbol, 'Min15', 200);
+      if (!klines || !klines.time?.length) {
+        toast.error('Không lấy được dữ liệu thị trường');
+        return;
+      }
+      const candles = klines.time.map((t, i) => ({
+        time: t,
+        open: klines.open[i],
+        high: klines.high[i],
+        low: klines.low[i],
+        close: klines.close[i],
+        volume: klines.vol[i],
+      }));
+
+
+      // 3. Analyze
+      const signal = generateSignal(candles);
+      if (signal.type === 'NEUTRAL') {
+        toast.error('Tín hiệu trung lập - không có gợi ý');
+        return;
+      }
+
+      // 4. Calculate Size (Default 2% risk, 10x leverage)
+      const riskPercent = 2;
+      const leverageVal = 10;
+      const entryPrice = signal.entry;
+      const qty = calcPositionSize(balance, riskPercent, entryPrice, signal.stopLoss, leverageVal, 0, 0.95, contractSize);
+      if (!qty || qty <= 0) {
+        toast.error('Không thể tính khối lượng an toàn cho lệnh gợi ý');
+        return;
+      }
+
+      // 5. Update Form
+      setSide(signal.type === 'SHORT' ? 'SHORT' : 'LONG');
+      setPrice(entryPrice.toString());
+      setStopLoss(signal.stopLoss.toFixed(2));
+      setTakeProfit(signal.takeProfit.toFixed(2));
+      setQuantity(qty.toString());
+      setLeverage(leverageVal.toString());
+      toast.success(`🤖 AI gợi ý: ${signal.type === 'LONG' ? 'LONG' : 'SHORT'} ${qty} @ ${entryPrice.toFixed(2)}`);
+    } catch (err) {
+      console.error('[AI Suggest] Error:', err);
+      toast.error('Lỗi khi AI phân tích');
+    } finally {
+      setAiSuggestionLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!credentials) {
       toast.error('Cần cấu hình API key trước!');
@@ -93,6 +172,26 @@ export default function OrderPanel({ prefillSignal }: Props) {
 
       if (result?.success) {
         toast.success(`✅ Đặt lệnh thành công! ID: ${result.data}`);
+        
+        // Send Telegram Notification
+        if (telegramCredentials?.botToken && telegramCredentials?.adminChatId) {
+          try {
+            const msg = `✅ <b>Đặt lệnh thành công!</b>\n\n🏷️ Cặp: ${selectedSymbol}\n📊 Side: ${side}\n💵 Giá: ${effectivePrice}\n📏 Số lượng: ${parsedQuantity}\n🔎 Đòn bẩy: ${parsedLeverage}x\n🛡️ SL: ${stopLoss || 'N/A'}\n🎯 TP: ${takeProfit || 'N/A'}`;
+            await fetch(`https://api.telegram.org/bot${telegramCredentials.botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: telegramCredentials.adminChatId,
+                text: msg,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+              }),
+            });
+          } catch (e) {
+            console.error('[Telegram] Notify failed', e);
+          }
+        }
+
         const order: PendingOrder = {
           id: result.data?.toString() || Date.now().toString(),
           symbol: selectedSymbol,
@@ -332,6 +431,16 @@ export default function OrderPanel({ prefillSignal }: Props) {
             />
           </div>
         </div>
+
+        <button
+          id="ai-suggest-order-button"
+          onClick={handleAISuggest}
+          disabled={aiSuggestionLoading}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(139,92,246,0.45)] bg-[rgba(139,92,246,0.12)] py-2.5 text-sm font-bold text-[#dcc0ff] transition-all hover:bg-[rgba(139,92,246,0.25)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Sparkles className={`h-4 w-4 ${aiSuggestionLoading ? 'animate-spin' : ''}`} />
+          {aiSuggestionLoading ? 'Đang phân tích...' : '🤖 AI Gợi ý lệnh'}
+        </button>
 
         <button
           id="order-panel-submit-button"

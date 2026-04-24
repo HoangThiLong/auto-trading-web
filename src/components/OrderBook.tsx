@@ -108,7 +108,7 @@ export default function OrderBook() {
               return (
                 <div key={i} className="relative grid grid-cols-3 text-[13px] px-3 py-[3px] hover:bg-[var(--bg-surface-soft)] cursor-pointer">
                   <div className="absolute inset-0 right-0 flex pointer-events-none">
-                    <div className="ml-auto h-full bg-[var(--color-danger)] opacity-10 transition-all duration-300" style={{ width: `${pct}%` }} />
+                    <div className="ml-auto h-full bg-[var(--color-danger)] opacity-[0.06] transition-all duration-300" style={{ width: `${Math.min(pct, 82)}%` }} />
                   </div>
                   <span className="font-mono font-bold text-[var(--color-danger)] z-10">{formatPrice(ask[0])}</span>
                   <span className="font-mono text-[var(--text-secondary)] text-center z-10">{ask[1].toLocaleString()}</span>
@@ -123,7 +123,7 @@ export default function OrderBook() {
             <div className={`text-xl font-bold font-mono tracking-tight drop-shadow-sm ${ticker && ticker.riseFallRate >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
               {ticker ? formatPrice(ticker.lastPrice) : '---'}
               {ticker && (
-                <span className="text-xs ml-2 font-semibold bg-[currentColor] bg-opacity-10 px-1.5 py-0.5 rounded align-top">
+                <span className={`text-xs ml-2 font-semibold px-1.5 py-0.5 rounded align-top ${ticker.riseFallRate >= 0 ? 'bg-[#0ecb81]/15 text-[#0ecb81]' : 'bg-[#f6465d]/15 text-[#f6465d]'}`}>
                   {ticker.riseFallRate >= 0 ? '+' : ''}{(ticker.riseFallRate * 100).toFixed(2)}%
                 </span>
               )}
@@ -142,7 +142,7 @@ export default function OrderBook() {
               return (
                 <div key={i} className="relative grid grid-cols-3 text-[13px] px-3 py-[3px] hover:bg-[var(--bg-surface-soft)] cursor-pointer">
                   <div className="absolute inset-0 right-0 flex pointer-events-none">
-                    <div className="ml-auto h-full bg-[var(--color-success)] opacity-10 transition-all duration-300" style={{ width: `${pct}%` }} />
+                    <div className="ml-auto h-full bg-[var(--color-success)] opacity-[0.06] transition-all duration-300" style={{ width: `${Math.min(pct, 82)}%` }} />
                   </div>
                   <span className="font-mono font-bold text-[var(--color-success)] z-10">{formatPrice(bid[0])}</span>
                   <span className="font-mono text-[var(--text-secondary)] text-center z-10">{bid[1].toLocaleString()}</span>
@@ -161,9 +161,9 @@ export default function OrderBook() {
           </div>
           {trades.map((trade, i) => (
             <div key={i} className="grid grid-cols-3 text-[13px] px-3 py-1.5 hover:bg-[var(--bg-surface-soft)] border-b border-[var(--border-soft)] border-opacity-50">
-              <span className={`font-mono font-bold ${trade.T === 1 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{formatPrice(trade.p)}</span>
-              <span className="font-mono text-[var(--text-secondary)] text-center">{trade.v}</span>
-              <span className="font-mono text-[var(--text-dim)] text-right">{formatTime(trade.t)}</span>
+              <span className={`font-mono font-bold ${trade.T === 1 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{formatPrice(trade.p ?? trade.price ?? 0)}</span>
+              <span className="font-mono text-[var(--text-secondary)] text-center">{trade.v ?? trade.qty ?? 0}</span>
+              <span className="font-mono text-[var(--text-dim)] text-right">{formatTime(trade.t ?? trade.time ?? Date.now())}</span>
             </div>
           ))}
         </div>

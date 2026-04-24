@@ -401,8 +401,8 @@ export default function TradingChart({ onCandlesReady }: Props) {
       if (!debouncedUpdatesRef.current || disposed) return;
 
       const now = Date.now();
-      // Debounce updates to every 150ms to reduce excessive rendering
-      if (now - lastUpdateTimeRef.current > 150) {
+      // Debounce updates to every 80ms for smoother real-time rendering without flooding the UI thread
+      if (now - lastUpdateTimeRef.current > 80) {
         if (candleSeriesRef.current && debouncedUpdatesRef.current.candle) {
           try {
             candleSeriesRef.current.update(debouncedUpdatesRef.current.candle);
@@ -425,7 +425,7 @@ export default function TradingChart({ onCandlesReady }: Props) {
         if (updateTimeoutRef.current !== null) {
           window.clearTimeout(updateTimeoutRef.current);
         }
-        updateTimeoutRef.current = window.setTimeout(updateChartWithDebounce, 150 - (now - lastUpdateTimeRef.current));
+        updateTimeoutRef.current = window.setTimeout(updateChartWithDebounce, 80 - (now - lastUpdateTimeRef.current));
       }
     };
 
@@ -442,24 +442,32 @@ export default function TradingChart({ onCandlesReady }: Props) {
           if (disposed) return;
 
           try {
+            // Handle both formats: msg.channel='push.kline' and nested msg.data.channel
+            const channel = msg.channel || (msg.data && msg.data.channel);
+            if (channel !== 'push.kline') return;
+
             const msgSymbol = msg.symbol || msg.data?.symbol || msg.data?.s;
             if (msgSymbol && msgSymbol !== activeSymbol) return;
             if (msg.data && msg.data.c) {
-              const c = msg.data;
+              const d = msg.data;
+              const timestamp = d.t || d.T;
+              if (typeof timestamp !== 'number') return;
+
+              // MEXC Contract kline fields: o, c, h, l, q (amount in USD), a (volume in contracts)
               const newCandle = {
-                time: c.t,
-                open: Number(c.o),
-                high: Number(c.h),
-                low: Number(c.l),
-                close: Number(c.c),
-                volume: Number(c.a || c.v || 0)
+                time: timestamp,
+                open: Number(d.o),
+                high: Number(d.h),
+                low: Number(d.l),
+                close: Number(d.c),
+                volume: Number(d.q || d.a || 0)
               };
 
               // Store in debounced buffer
               debouncedUpdatesRef.current = {
                 candle: newCandle,
                 volume: {
-                  time: c.t,
+                  time: timestamp,
                   value: newCandle.volume,
                   color: newCandle.close >= newCandle.open ? '#0ecb8133' : '#f6465d33'
                 }
@@ -578,11 +586,18 @@ export default function TradingChart({ onCandlesReady }: Props) {
 
       {/* Signal bar */}
       {signal && signal.type !== 'NEUTRAL' && (
-        <div className={`flex items-center gap-4 px-4 py-2 text-sm border-b ${signal.type === 'LONG' ? 'bg-green-950 border-green-900' : 'bg-red-950 border-red-900'}`}>
-          <Activity className="w-4 h-4" />
-          <span className={`font-bold ${signal.type === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
-            {signal.type === 'LONG' ? '🚀 TÍN HIỆU LONG' : '📉 TÍN HIỆU SHORT'} — {signal.strength}
+        <div className="flex items-center gap-3 px-4 py-2 text-sm border-b border-[#182033] bg-[#0e1421]/85 backdrop-blur-sm">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${
+              signal.type === 'LONG'
+                ? 'bg-[#0ecb81]/15 text-[#0ecb81]'
+                : 'bg-[#f6465d]/15 text-[#f6465d]'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            {signal.type === 'LONG' ? 'TÍN HIỆU LONG' : 'TÍN HIỆU SHORT'}
           </span>
+          <span className="text-gray-400">{signal.strength}</span>
           <span className="text-gray-400">Entry: <span className="text-white font-mono">{signal.entry.toFixed(2)}</span></span>
           <span className="text-green-400">TP: <span className="font-mono">{signal.takeProfit.toFixed(2)}</span></span>
           <span className="text-red-400">SL: <span className="font-mono">{signal.stopLoss.toFixed(2)}</span></span>

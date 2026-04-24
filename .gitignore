@@ -63,3 +63,6 @@ test-mexc-live.ts
 test_ws.cjs
 bot.ts
 ecosystem.config.js
+.code-review-graph/
+scratch/
+.kiro/

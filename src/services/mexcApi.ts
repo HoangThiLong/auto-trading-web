@@ -1,45 +1,58 @@
 /// <reference types="vite/client" />
 import CryptoJS from 'crypto-js';
 import { readRuntimeEnv } from '../utils/runtimeEnv';
+import { connectionManager } from './connectionManager';
 import type { ContractTicker, KlineData, OrderBook, FundingRate, ContractInfo, TimeInterval, RecentTrade } from '../types';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Detect if request options contain authentication headers (ApiKey/Signature) */
+function hasAuthHeaders(options?: RequestInit): boolean {
+  if (!options?.headers) return false;
+  const h = options.headers as Record<string, string>;
+  return !!(h['ApiKey'] || h['Signature']);
+}
+
+/**
+ * Smart fetch with retry + automatic failover via ConnectionManager.
+ * - Public requests: direct first, auto-relay on failure.
+ * - Private/signed requests: always direct (never relayed for security).
+ */
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  const isPrivate = hasAuthHeaders(options);
   let attempt = 0;
+
   while (true) {
     try {
-      const controller = new AbortController();
-      const signal = controller.signal;
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s absolute timeout
+      // Use ConnectionManager for intelligent routing
+      const res = await connectionManager.fetch(url, {
+        ...options,
+        headers: { ...options.headers as Record<string, string> },
+      }, isPrivate);
 
-      const res = await fetch(url, { ...options, signal });
-      clearTimeout(timeoutId);
-      
       // Retry on 429 (Rate Limit) or 5xx (Server Error)
       if (!res.ok && (res.status === 429 || res.status >= 500)) {
         if (attempt >= maxRetries) {
           throw new Error(`HTTP ${res.status}: Max retries reached after ${attempt} attempts`);
         }
-        
-        // Jittered backoff: (2^attempt * 1000ms) + 0-500ms
+
         const delay = (Math.pow(2, attempt) * 1000) + Math.random() * 500;
         console.warn(`[MEXC HTTP] Status ${res.status} (attempt ${attempt + 1}). Retrying in ${Math.round(delay)}ms...`);
         await wait(delay);
         attempt++;
         continue;
       }
-      
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
     } catch (err: any) {
       if (attempt >= maxRetries) {
         throw err;
       }
-      
+
       const isNetworkError = err.name === 'AbortError' || err.message?.includes('network') || err.message?.includes('reset');
       const delay = (Math.pow(2, attempt) * 1000) + Math.random() * 500;
-      
+
       console.warn(`[MEXC HTTP] ${isNetworkError ? 'Network Error' : 'Error'}: ${err.message}. Retrying in ${Math.round(delay)}ms...`);
       await wait(delay);
       attempt++;
@@ -48,28 +61,58 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 }
 
 // MEXC Network URLs - determined at runtime
-const MEXC_NETWORKS = {
+// Note: MEXC Futures have a dedicated endpoint: wss://contract.mexc.com/edge
+// REST API uses https://api.mexc.com
+const MEXC_NETWORKS: Record<'live' | 'demo', { rest: string; ws: string }> = {
   live: {
-    rest: 'https://contract.mexc.com',
+    rest: 'https://api.mexc.com',
     ws: 'wss://contract.mexc.com/edge',
   },
   demo: {
-    rest: 'https://contract-testnet.mexc.com',
-    ws: 'wss://contract-testnet.mexc.com/edge',
+    rest: 'https://api.mexc.com',
+    ws: 'wss://contract.mexc.com/edge',
   },
 };
 
+// Runtime global override for UI-driven network switching
+const GLOBAL_NETWORK_KEY = '__ctxMexcNetwork' as const;
+
 const getMexcNetwork = (): 'live' | 'demo' => {
-  // Priority: runtimeEnv > credentials.mexcNetwork > default 'live'
-  const envNetwork = readRuntimeEnv('MEXC_NETWORK');
-  if (envNetwork === 'demo' || envNetwork === 'live') return envNetwork;
+  // 1. Check globalThis override (set by UI when switching networks)
+  const globalOverride = (globalThis as unknown as Record<string, string>)[GLOBAL_NETWORK_KEY];
+  if (globalOverride === 'demo' || globalOverride === 'live') return globalOverride;
+
+  // 2. Check runtime environment variable
+  try {
+    const envNetwork = readRuntimeEnv('MEXC_NETWORK');
+    if (envNetwork === 'demo' || envNetwork === 'live') return envNetwork;
+  } catch {
+    // readRuntimeEnv might throw if file not found, ignore
+  }
+
+  // 3. Default to live
   return 'live';
 };
 
+/**
+ * Called by UI when user toggles network in ApiKeyModal.
+ * Updates the global override so mexcApi uses the new network immediately without reload.
+ */
+export function setRuntimeMexcNetwork(network: 'live' | 'demo') {
+  (globalThis as unknown as Record<string, string>)[GLOBAL_NETWORK_KEY] = network;
+  console.log(`[MEXC API] 🌐 Switched to ${network.toUpperCase()} network`);
+}
+
 // Current network config
-const mexcConfig = MEXC_NETWORKS[getMexcNetwork()];
-const MEXC_API_ROOT = mexcConfig.rest;
-const MEXC_WS_URL = mexcConfig.ws;
+export const getMexcApiRoot = (): string => {
+  const net = getMexcNetwork();
+  return MEXC_NETWORKS[net].rest;
+};
+
+export const getMexcWsUrl = (): string => {
+  const net = getMexcNetwork();
+  return MEXC_NETWORKS[net].ws;
+};
 
 // ─── Time Sync Manager (NTP-like offset against MEXC server) ────────────────
 
@@ -94,6 +137,11 @@ class TimeSyncManager {
     return this.offsetMs;
   }
 
+  /** Timestamp of last successful sync. */
+  getLastSyncAt(): number {
+    return this.lastSyncAt;
+  }
+
   /**
    * Synchronize local clock against MEXC `/api/v1/contract/ping`.
    * Uses round-trip compensation for accuracy.
@@ -108,7 +156,7 @@ class TimeSyncManager {
         );
 
         const t0 = Date.now();
-        const res = await fetch(`${MEXC_API_ROOT}/api/v1/contract/ping`, {
+        const res = await fetch(`${getMexcApiRoot()}/api/v1/contract/ping`, {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -184,7 +232,7 @@ const buildRequestUrl = (url: string): string => {
   }
 
   const normalizedPath = url.startsWith('/') ? url : `/${url}`;
-  return `${MEXC_API_ROOT}${normalizedPath}`;
+  return `${getMexcApiRoot()}${normalizedPath}`;
 };
 
 const api = {
@@ -226,7 +274,7 @@ export async function fetchAllTickers(): Promise<ContractTicker[]> {
     }
     return [];
   } catch (err) {
-    console.error('[MEXC] fetchAllTickers error:', err);
+    console.warn('[MEXC] fetchAllTickers error:', err);
     return [];
   }
 }
@@ -237,7 +285,7 @@ export async function fetchTicker(symbol: string): Promise<ContractTicker | null
     if (data.success) return data.data;
     return null;
   } catch (err) {
-    console.error('[MEXC] fetchTicker error:', err);
+    console.warn('[MEXC] fetchTicker error:', err);
     return null;
   }
 }
@@ -256,7 +304,7 @@ export async function fetchKlines(symbol: string, interval: TimeInterval = 'Min1
     if (data.success) return data.data;
     return null;
   } catch (err) {
-    console.error('[MEXC] fetchKlines error:', err);
+    console.warn('[MEXC] fetchKlines error:', err);
     return null;
   }
 }
@@ -267,7 +315,7 @@ export async function fetchOrderBook(symbol: string, limit = 20): Promise<OrderB
     if (data.success) return data.data;
     return null;
   } catch (err) {
-    console.error('[MEXC] fetchOrderBook error:', err);
+    console.warn('[MEXC] fetchOrderBook error:', err);
     return null;
   }
 }
@@ -278,7 +326,7 @@ export async function fetchFundingRate(symbol: string): Promise<FundingRate | nu
     if (data.success) return data.data;
     return null;
   } catch (err) {
-    console.error('[MEXC] fetchFundingRate error:', err);
+    console.warn('[MEXC] fetchFundingRate error:', err);
     return null;
   }
 }
@@ -292,7 +340,7 @@ export async function fetchContractInfo(symbol?: string): Promise<ContractInfo[]
     }
     return [];
   } catch (err) {
-    console.error('[MEXC] fetchContractInfo error:', err);
+    console.warn('[MEXC] fetchContractInfo error:', err);
     return [];
   }
 }
@@ -303,7 +351,7 @@ export async function fetchRecentTrades(symbol: string, limit = 50): Promise<Rec
     if (data.success) return data.data;
     return [];
   } catch (err) {
-    console.error('[MEXC] fetchRecentTrades error:', err);
+    console.warn('[MEXC] fetchRecentTrades error:', err);
     return [];
   }
 }
@@ -311,6 +359,7 @@ export async function fetchRecentTrades(symbol: string, limit = 50): Promise<Rec
 // ─── Signed Requests (requires API key) ────────────────────────────────────
 
 function signRequest(apiKey: string, secretKey: string, timestamp: string, body?: string): string {
+  // V1 Contract API Signature: apiKey + timestamp + (body || '') — NO recvWindow
   const signStr = body ? apiKey + timestamp + body : apiKey + timestamp;
   return CryptoJS.HmacSHA256(signStr, secretKey).toString();
 }
@@ -319,6 +368,8 @@ export async function fetchAccountInfo(apiKey: string, secretKey: string) {
   try {
     const timestamp = timeSyncManager.getServerTimestamp();
     const signature = signRequest(apiKey, secretKey, timestamp);
+
+    console.log(`[MEXC] Fetching account info with timestamp=${timestamp}`);
 
     const data = await api.get('/api/v1/private/account/assets', {
       headers: {
@@ -330,7 +381,7 @@ export async function fetchAccountInfo(apiKey: string, secretKey: string) {
     });
     if (data.success) return data.data;
     return null;
-  } catch (err) {
+  } catch (err: any) {
     console.error('[MEXC] fetchAccountInfo error:', err);
     return null;
   }
@@ -384,7 +435,8 @@ export async function fetchOpenPositions(apiKey: string, secretKey: string) {
     });
     if (data.success) return data.data;
     return [];
-  } catch {
+  } catch (err) {
+    console.warn('[MEXC] fetchOpenPositions error:', err);
     return [];
   }
 }
@@ -404,7 +456,8 @@ export async function fetchOpenOrders(apiKey: string, secretKey: string, symbol?
     });
     if (data.success) return data.data;
     return [];
-  } catch {
+  } catch (err) {
+    console.warn('[MEXC] fetchOpenOrders error:', err);
     return [];
   }
 }
@@ -415,7 +468,7 @@ type WsCallback = (data: any) => void;
 
 class MexcWebSocketManager {
   private ws: WebSocket | null = null;
-  private url = MEXC_WS_URL;
+  private url = getMexcWsUrl();
   private pingInterval: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnecting = false;
@@ -461,6 +514,7 @@ class MexcWebSocketManager {
     this.isConnecting = true;
 
     try {
+      this.url = getMexcWsUrl();
       this.ws = new WebSocket(this.url);
       
       this.ws.onopen = () => {
@@ -477,11 +531,21 @@ class MexcWebSocketManager {
 
       this.ws.onmessage = (event) => {
         try {
+          if (typeof event.data !== 'string') return;
           const msg = JSON.parse(event.data);
-          const channel = msg.channel;
+          const channel = msg.channel || msg.ch || msg.topic || msg.method;
           if (channel === 'pong') return;
-          
-          if (this.callbacks.has(channel)) {
+          if (!channel) return;
+
+          // MEXC WS sends channel like "push.ticker" with symbol in msg.symbol or msg.data.symbol.
+          // We subscribe with symbol-specific keys like "push.ticker.BTC_USDT".
+          // Route to the symbol-specific channel if symbol info is available.
+          const msgSymbol = msg.symbol || msg.data?.symbol || msg.data?.s;
+
+          if (msgSymbol && this.callbacks.has(`${channel}.${msgSymbol}`)) {
+            this.callbacks.get(`${channel}.${msgSymbol}`)!.forEach(cb => cb(msg));
+          } else if (this.callbacks.has(channel)) {
+            // Fallback: route to generic channel for backward compatibility
             this.callbacks.get(channel)!.forEach(cb => cb(msg));
           }
         } catch (err) {
@@ -508,9 +572,9 @@ class MexcWebSocketManager {
 
   private cleanup() {
     if (this.pingInterval) clearInterval(this.pingInterval);
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.pingInterval = null;
-    this.reconnectTimer = null;
+    // NOTE: Do NOT clear reconnectTimer here — scheduleReconnect() is called after cleanup()
+    // in onclose handler, and it manages its own timer lifecycle.
     this.ws = null;
     this.isConnecting = false;
   }
@@ -580,20 +644,24 @@ class MexcWebSocketManager {
   }
 
   subscribeTicker(symbol: string, cb: WsCallback) {
-    return this.subscribe(`push.ticker`, { method: 'sub.ticker', param: { symbol } }, cb);
+    return this.subscribe(`push.ticker.${symbol}`, { method: 'sub.ticker', param: { symbol } }, cb);
   }
 
   subscribeKline(symbol: string, interval: TimeInterval, cb: WsCallback) {
-    return this.subscribe(`push.kline`, { method: 'sub.kline', param: { symbol, interval } }, cb);
+    return this.subscribe(`push.kline.${symbol}.${interval}`, { method: 'sub.kline', param: { symbol, interval } }, cb);
   }
 
   subscribeDepth(symbol: string, cb: WsCallback) {
-    return this.subscribe(`push.depth`, { method: 'sub.depth', param: { symbol } }, cb);
+    return this.subscribe(`push.depth.${symbol}`, { method: 'sub.depth', param: { symbol } }, cb);
   }
 
   subscribeDeals(symbol: string, cb: WsCallback) {
-    return this.subscribe(`push.deal`, { method: 'sub.deal', param: { symbol } }, cb);
+    return this.subscribe(`push.deal.${symbol}`, { method: 'sub.deal', param: { symbol } }, cb);
   }
 }
 
 export const mexcWs = new MexcWebSocketManager();
+
+// Re-export connection manager for UI consumption
+export { connectionManager } from './connectionManager';
+export type { ConnectionMode } from './connectionManager';

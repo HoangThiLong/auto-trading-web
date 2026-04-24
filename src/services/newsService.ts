@@ -5,44 +5,77 @@ const CRYPTOPANIC_BASE = 'https://cryptopanic.com/api/v1';
 // Fallback: fetch from Cointelegraph RSS converted to JSON via rss2json
 const ALTERNATIVE_NEWS_URL = 'https://api.rss2json.com/v1/api.json?rss_url=https://cointelegraph.com/rss';
 
+function normalizeNewsItem(raw: {
+  id: string | number;
+  title?: string;
+  url?: string;
+  source?: string;
+  publishedAt?: string;
+  sentiment?: 'positive' | 'negative' | 'neutral';
+  votes?: { positive?: number; negative?: number; important?: number };
+}): NewsItem | null {
+  if (!raw.title || !raw.url) return null;
+
+  const publishedAt = raw.publishedAt && !Number.isNaN(new Date(raw.publishedAt).getTime())
+    ? new Date(raw.publishedAt).toISOString()
+    : new Date().toISOString();
+
+  return {
+    id: raw.id,
+    title: raw.title,
+    url: raw.url,
+    source: raw.source || 'Unknown',
+    publishedAt,
+    sentiment: raw.sentiment || 'neutral',
+    votes: {
+      positive: raw.votes?.positive || 0,
+      negative: raw.votes?.negative || 0,
+      important: raw.votes?.important || 0,
+    },
+  };
+}
+
 export async function fetchCryptoPanicNews(apiKey?: string): Promise<NewsItem[]> {
   try {
-    // Use CryptoPanic API if key is provided
     if (apiKey) {
       const url = `${CRYPTOPANIC_BASE}/posts/?auth_token=${apiKey}&public=true&kind=news&filter=important&currencies=BTC,ETH,SOL`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        return (data.results || []).slice(0, 20).map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          url: item.url,
-          source: item.source?.title || 'Unknown',
-          publishedAt: item.published_at,
-          sentiment: item.votes?.negative > item.votes?.positive ? 'negative' :
-                     item.votes?.positive > 0 ? 'positive' : 'neutral',
-          votes: {
-            positive: item.votes?.positive || 0,
-            negative: item.votes?.negative || 0,
-            important: item.votes?.important || 0,
-          },
-        }));
+        return (data.results || [])
+          .slice(0, 20)
+          .map((item: { id: string | number; title?: string; url?: string; source?: { title?: string }; published_at?: string; votes?: { positive?: number; negative?: number; important?: number } }) => normalizeNewsItem({
+            id: item.id,
+            title: item.title,
+            url: item.url,
+            source: item.source?.title || 'Unknown',
+            publishedAt: item.published_at,
+            sentiment: item.votes?.negative > item.votes?.positive ? 'negative' : item.votes?.positive > 0 ? 'positive' : 'neutral',
+            votes: {
+              positive: item.votes?.positive || 0,
+              negative: item.votes?.negative || 0,
+              important: item.votes?.important || 0,
+            },
+          }))
+          .filter((item): item is NewsItem => item !== null);
       }
     }
 
-    // Fallback: Cointelegraph RSS
     const res = await fetch(ALTERNATIVE_NEWS_URL);
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.items || []).slice(0, 15).map((item: any, i: number) => ({
-      id: i,
-      title: item.title,
-      url: item.link,
-      source: 'Cointelegraph',
-      publishedAt: new Date(item.pubDate).toISOString(),
-      sentiment: categorizeSentiment(item.title + ' ' + (item.description || '')),
-      votes: { positive: 0, negative: 0, important: 0 },
-    }));
+    return (data.items || [])
+      .slice(0, 15)
+      .map((item: { title?: string; link?: string; author?: string; source?: string; pubDate?: string; description?: string }, i: number) => normalizeNewsItem({
+        id: i,
+        title: item.title,
+        url: item.link,
+        source: item.author || item.source || 'Cointelegraph',
+        publishedAt: item.pubDate,
+        sentiment: categorizeSentiment(item.title + ' ' + (item.description || '')),
+        votes: { positive: 0, negative: 0, important: 0 },
+      }))
+      .filter((item): item is NewsItem => item !== null);
   } catch (err) {
     console.error('[News] fetch error:', err);
     return [];

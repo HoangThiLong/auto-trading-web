@@ -1,7 +1,7 @@
 import type { OrderIntentBuildPayload } from './analysis';
 import { buildOrderIntentInWorker, generateSignalInWorker } from './analysisWorkerClient';
 import { guardedNetworkQueue } from './asyncTaskQueue';
-import { calcDailyPnL, calcPositionSize } from './capitalManager';
+import { calcDailyPnL, calcPositionSize, ensureValidTPSL } from './capitalManager';
 import { analyzeWithAI } from './geminiAi';
 import { fetchKlines, placeOrder } from './mexcApi';
 import { isSafeToTrade } from './newsService';
@@ -52,6 +52,7 @@ export interface HeadlessBotActions {
   addAutoTradeLog: (log: AutoTradeLog) => void;
   updateAutoTradeLog: (id: string, updates: Partial<AutoTradeLog>) => void;
   addOrder: (order: PendingOrder) => void;
+  removeOrder: (id: string) => void;
   addTradeLesson: (lesson: string) => void;
   setSignal?: (symbol: string, signal: TradeSignal) => void;
 }
@@ -64,6 +65,8 @@ export interface HeadlessBotDependencies {
   pnlCheckIntervalMs?: number;
   /** Optional SQLite adapter for persistent storage (headless bot only). */
   db?: DatabaseAdapter;
+  /** Optional callback for trade events (order opened, TP/SL hit, etc.). */
+  onTradeEvent?: (event: TradeEventMessage) => void;
 }
 
 const noopLogger: HeadlessBotLogger = {
@@ -81,6 +84,23 @@ function generateCorrelationId(prefix = 'tick'): string {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(16).slice(2, 6);
   return `${prefix}_${ts}_${rand}`;
+}
+
+export type TradeEventType = 'ORDER_OPENED' | 'TP_HIT' | 'SL_HIT' | 'DAILY_LOSS_LIMIT' | 'ORDER_FAILED';
+
+export interface TradeEventMessage {
+  type: TradeEventType;
+  correlationId: string;
+  symbol?: string;
+  side?: string;
+  mode?: string;
+  entry?: number;
+  quantity?: number;
+  leverage?: number;
+  tp?: number;
+  sl?: number;
+  pnl?: number;
+  message: string;
 }
 
 /**
@@ -114,6 +134,7 @@ export class HeadlessBotService {
   private readonly tickIntervalMs: number;
   private readonly pnlCheckIntervalMs: number;
   public readonly db: DatabaseAdapter | null;
+  private readonly onTradeEvent?: (event: TradeEventMessage) => void;
 
   private intervalRef: ReturnType<typeof setInterval> | null = null;
   private checkPnlIntervalRef: ReturnType<typeof setInterval> | null = null;
@@ -132,6 +153,20 @@ export class HeadlessBotService {
     this.tickIntervalMs = deps.tickIntervalMs ?? 30_000;
     this.pnlCheckIntervalMs = deps.pnlCheckIntervalMs ?? 15_000;
     this.db = deps.db ?? null;
+    this.onTradeEvent = deps.onTradeEvent;
+  }
+
+  private emitTradeEvent(event: TradeEventMessage): void {
+    if (!this.onTradeEvent) return;
+
+    try {
+      this.onTradeEvent(event);
+    } catch (error) {
+      this.logger.error('[HeadlessBot] onTradeEvent callback failed', {
+        error: error instanceof Error ? error.message : String(error),
+        eventType: event.type,
+      });
+    }
   }
 
   // ─── Symbol Blacklist Management ────────────────────────────────────────
@@ -258,14 +293,21 @@ export class HeadlessBotService {
   private isDuplicateIntent(intentId: string): boolean {
     const state = this.getState();
 
-    const hasPendingIntent = state.pendingOrders.some(
-      (order) => order.intentId === intentId && order.status === 'PENDING',
-    );
-    if (hasPendingIntent) return true;
-
-    return state.autoTradeLogs.some(
+    // Only block if there's an OPENED order with the same intentId
+    // (prevents double-execution within the same tick cycle)
+    const hasActive = state.autoTradeLogs.some(
       (log) => log.intentId === intentId && log.status === 'OPENED',
     );
+    if (hasActive) return true;
+
+    // Also check if we opened this intent very recently (< 60s ago) to prevent
+    // rapid-fire duplicates from overlapping ticks
+    const recentMatch = state.autoTradeLogs.some(
+      (log) =>
+        log.intentId === intentId &&
+        Date.now() - log.timestamp < 60_000,
+    );
+    return recentMatch;
   }
 
   private getContractSizeBySymbol(symbol: string): number {
@@ -298,12 +340,13 @@ export class HeadlessBotService {
 
       if (!inProfit) continue;
 
-      const trailingMultiplier = 1.5;
-      const atrApprox = ticker.high24Price - ticker.lower24Price;
-      const currentTrail =
-        currentPrice - (log.side === 'LONG' ? atrApprox * trailingMultiplier : -atrApprox * trailingMultiplier);
-
       const existingTrail = this.trailingStops[log.id]?.originalSl ?? log.sl;
+      const protectedMove = Math.abs(log.entry - existingTrail);
+      const trailingDistance = Math.max(protectedMove * 0.5, Math.abs(log.entry) * 0.0025);
+      const currentTrail = log.side === 'LONG'
+        ? currentPrice - trailingDistance
+        : currentPrice + trailingDistance;
+
       const canTighten =
         (log.side === 'LONG' && currentTrail > existingTrail) ||
         (log.side === 'SHORT' && currentTrail < existingTrail);
@@ -332,7 +375,6 @@ export class HeadlessBotService {
     }
 
     const cid = generateCorrelationId('pnl');
-    const slog = scopedLogger(this.logger, cid);
 
     this.updateTrailingStops();
 
@@ -360,6 +402,28 @@ export class HeadlessBotService {
             mode: log.mode,
             pnl,
           });
+
+          this.emitTradeEvent({
+            type: 'TP_HIT',
+            correlationId: cid,
+            symbol: log.symbol,
+            side: log.side,
+            mode: log.mode,
+            entry: log.entry,
+            quantity: log.quantity,
+            leverage: log.leverage,
+            tp: log.tp,
+            sl: log.sl,
+            pnl: Math.round(pnl * 100) / 100,
+            message: `✅ TP hit ${log.symbol} ${log.side} | PnL: ${Math.round(pnl * 100) / 100}`,
+          });
+
+          // Cleanup trailing stop snapshot and pending order for this log
+          delete this.trailingStops[log.id];
+          const pendingOrder = state.pendingOrders.find(
+            (o) => o.intentId === log.intentId,
+          );
+          if (pendingOrder) this.actions.removeOrder(pendingOrder.id);
         } else if (price <= log.sl) {
           const pnl = (log.sl - log.entry) * log.quantity * contractSize * log.leverage;
           this.actions.updateAutoTradeLog(log.id, {
@@ -378,6 +442,28 @@ export class HeadlessBotService {
             mode: log.mode,
             pnl,
           });
+
+          this.emitTradeEvent({
+            type: 'SL_HIT',
+            correlationId: cid,
+            symbol: log.symbol,
+            side: log.side,
+            mode: log.mode,
+            entry: log.entry,
+            quantity: log.quantity,
+            leverage: log.leverage,
+            tp: log.tp,
+            sl: log.sl,
+            pnl: Math.round(pnl * 100) / 100,
+            message: `🛑 SL hit ${log.symbol} ${log.side} | PnL: ${Math.round(pnl * 100) / 100}`,
+          });
+
+          // Cleanup trailing stop snapshot and pending order for this log
+          delete this.trailingStops[log.id];
+          const pendingOrder = state.pendingOrders.find(
+            (o) => o.intentId === log.intentId,
+          );
+          if (pendingOrder) this.actions.removeOrder(pendingOrder.id);
         }
       } else if (price <= log.tp) {
         const pnl = (log.entry - log.tp) * log.quantity * contractSize * log.leverage;
@@ -393,6 +479,28 @@ export class HeadlessBotService {
           mode: log.mode,
           pnl,
         });
+
+        this.emitTradeEvent({
+          type: 'TP_HIT',
+          correlationId: cid,
+          symbol: log.symbol,
+          side: log.side,
+          mode: log.mode,
+          entry: log.entry,
+          quantity: log.quantity,
+          leverage: log.leverage,
+          tp: log.tp,
+          sl: log.sl,
+          pnl: Math.round(pnl * 100) / 100,
+          message: `✅ TP hit ${log.symbol} ${log.side} | PnL: ${Math.round(pnl * 100) / 100}`,
+        });
+
+        // Cleanup trailing stop snapshot and pending order for this log
+        delete this.trailingStops[log.id];
+        const pendingOrder = state.pendingOrders.find(
+          (o) => o.intentId === log.intentId,
+        );
+        if (pendingOrder) this.actions.removeOrder(pendingOrder.id);
       } else if (price >= log.sl) {
         const pnl = (log.entry - log.sl) * log.quantity * contractSize * log.leverage;
         this.actions.updateAutoTradeLog(log.id, {
@@ -411,6 +519,28 @@ export class HeadlessBotService {
           mode: log.mode,
           pnl,
         });
+
+        this.emitTradeEvent({
+          type: 'SL_HIT',
+          correlationId: cid,
+          symbol: log.symbol,
+          side: log.side,
+          mode: log.mode,
+          entry: log.entry,
+          quantity: log.quantity,
+          leverage: log.leverage,
+          tp: log.tp,
+          sl: log.sl,
+          pnl: Math.round(pnl * 100) / 100,
+          message: `🛑 SL hit ${log.symbol} ${log.side} | PnL: ${Math.round(pnl * 100) / 100}`,
+        });
+
+        // Cleanup trailing stop snapshot and pending order for this log
+        delete this.trailingStops[log.id];
+        const pendingOrder = state.pendingOrders.find(
+          (o) => o.intentId === log.intentId,
+        );
+        if (pendingOrder) this.actions.removeOrder(pendingOrder.id);
       }
     }
   }
@@ -444,6 +574,14 @@ export class HeadlessBotService {
       log.error('[HeadlessBot] Daily loss limit reached, shutting down bot', {
         dailyPnL,
         dailyLossLimit: config.dailyLossLimit,
+      });
+
+      this.emitTradeEvent({
+        type: 'DAILY_LOSS_LIMIT',
+        correlationId: cid,
+        mode: state.autoTradeMode,
+        pnl: Math.round(dailyPnL * 100) / 100,
+        message: `🚨 Daily loss limit reached | PnL: ${Math.round(dailyPnL * 100) / 100} / Limit: ${config.dailyLossLimit}`,
       });
 
       this.actions.setAutoTradeMode('off');
@@ -591,10 +729,6 @@ export class HeadlessBotService {
                   aiProvider: aiResult.provider,
                   aiAnalysis: aiResult.debateHistory || aiResult.analysis,
                 };
-
-                const temporaryTp = tradeSignal.takeProfit;
-                tradeSignal.takeProfit = tradeSignal.stopLoss;
-                tradeSignal.stopLoss = temporaryTp;
               } else {
                 tradeSignal = {
                   ...generatedSignal,
@@ -623,6 +757,28 @@ export class HeadlessBotService {
                   }
                 }
               }
+
+              if (tradeSignal.type === 'LONG' || tradeSignal.type === 'SHORT') {
+                const normalizedLevels = ensureValidTPSL(
+                  safePriceForAi,
+                  tradeSignal.takeProfit,
+                  tradeSignal.stopLoss,
+                  tradeSignal.type,
+                  tradeSignal.strength,
+                  (tradeSignal.winRate || 50) / 100,
+                  tradeSignal.indicators?.atr,
+                );
+
+                tradeSignal = {
+                  ...tradeSignal,
+                  takeProfit: normalizedLevels.takeProfit,
+                  stopLoss: normalizedLevels.stopLoss,
+                  riskReward: normalizedLevels.riskReward,
+                  reasons: normalizedLevels.usedFallback
+                    ? [...tradeSignal.reasons, '⚠️ TP/SL được chuẩn hóa lại để khớp hướng giao dịch']
+                    : tradeSignal.reasons,
+                };
+              }
             }
           }
 
@@ -633,10 +789,21 @@ export class HeadlessBotService {
               : tradeSignal.takeProfit < safePriceFinal && tradeSignal.stopLoss > safePriceFinal;
 
           if (!hasValidLevels) {
+            const fallbackLevels = ensureValidTPSL(
+              safePriceFinal,
+              fallbackTakeProfit,
+              fallbackStopLoss,
+              tradeSignal.type,
+              tradeSignal.strength,
+              (tradeSignal.winRate || 50) / 100,
+              tradeSignal.indicators?.atr,
+            );
             tradeSignal = {
               ...tradeSignal,
-              takeProfit: fallbackTakeProfit,
-              stopLoss: fallbackStopLoss,
+              takeProfit: fallbackLevels.takeProfit,
+              stopLoss: fallbackLevels.stopLoss,
+              riskReward: fallbackLevels.riskReward,
+              reasons: [...tradeSignal.reasons, '⚠️ TP/SL fallback được áp dụng do mức AI không hợp lệ'],
             };
           }
         }
@@ -651,9 +818,7 @@ export class HeadlessBotService {
         }
 
         if (tradeSignal.confidence < config.minConfidence) {
-          if (!(tradeSignal.marketRegime && tradeSignal.marketRegime !== 'VOLATILE')) {
-            continue;
-          }
+          continue;
         }
 
         const hasValidLevels =
@@ -807,6 +972,20 @@ export class HeadlessBotService {
             entry: orderIntent.entry,
             confidence: orderIntent.confidence,
           });
+
+          this.emitTradeEvent({
+            type: 'ORDER_OPENED',
+            correlationId: cid,
+            symbol: orderIntent.symbol,
+            side: orderIntent.side,
+            mode,
+            entry: orderIntent.entry,
+            quantity: orderIntent.quantity,
+            leverage: orderIntent.leverage,
+            tp: orderIntent.tp,
+            sl: orderIntent.sl,
+            message: `🟢 Order opened (simulation) ${orderIntent.symbol} ${orderIntent.side} @ ${orderIntent.entry}`,
+          });
         } else if (mode === 'live') {
           const result = await guardedNetworkQueue.enqueue(async () => {
             const liveState = this.getState();
@@ -870,6 +1049,20 @@ export class HeadlessBotService {
               entry: orderIntent.entry,
               orderId,
             });
+
+            this.emitTradeEvent({
+              type: 'ORDER_OPENED',
+              correlationId: cid,
+              symbol: orderIntent.symbol,
+              side: orderIntent.side,
+              mode,
+              entry: orderIntent.entry,
+              quantity: orderIntent.quantity,
+              leverage: orderIntent.leverage,
+              tp: orderIntent.tp,
+              sl: orderIntent.sl,
+              message: `🟢 Order opened (live) ${orderIntent.symbol} ${orderIntent.side} @ ${orderIntent.entry} | OrderID: ${orderId || 'N/A'}`,
+            });
           } else {
             this.actions.addAutoTradeLog({
               ...logEntry,
@@ -881,6 +1074,18 @@ export class HeadlessBotService {
               symbol: orderIntent.symbol,
               side: orderIntent.side,
               reason: result?.message || 'Order execution failed',
+            });
+
+            this.emitTradeEvent({
+              type: 'ORDER_FAILED',
+              correlationId: cid,
+              symbol: orderIntent.symbol,
+              side: orderIntent.side,
+              mode,
+              entry: orderIntent.entry,
+              quantity: orderIntent.quantity,
+              leverage: orderIntent.leverage,
+              message: `⚠️ Live order failed ${orderIntent.symbol} ${orderIntent.side} | Reason: ${result?.message || 'Order execution failed'}`,
             });
           }
         }

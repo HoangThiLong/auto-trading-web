@@ -1,5 +1,27 @@
 import type { CandlePoint, TradeSignal } from '../types';
 import { calcDynamicTPSL, calcWinRate } from './capitalManager';
+import {
+  normalizePrice,
+  normalizeQty,
+  hashIntentSeed,
+  calcEMA,
+  calcRSI,
+  calcMACD,
+  calcBollingerBands,
+  calcATR,
+  calcVolumeAvg,
+  calcStochRSI,
+} from '../utils/analysisUtils';
+
+export {
+  calcEMA,
+  calcRSI,
+  calcMACD,
+  calcBollingerBands,
+  calcATR,
+  calcVolumeAvg,
+  calcStochRSI,
+};
 
 export interface OrderIntentBuildPayload {
   symbol: string;
@@ -65,22 +87,6 @@ export type AnalysisWorkerResponse =
       error: string;
     };
 
-function normalizePrice(value: number): number {
-  return Number(value.toFixed(6));
-}
-
-function normalizeQty(value: number): number {
-  return Number(value.toFixed(6));
-}
-
-function hashIntentSeed(seed: string): string {
-  let hash = 5381;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 33) ^ seed.charCodeAt(i);
-  }
-  return (hash >>> 0).toString(36);
-}
-
 export function buildOrderIntent(payload: OrderIntentBuildPayload): OrderIntent {
   const entry = normalizePrice(payload.entry);
   const tp = normalizePrice(payload.tp);
@@ -123,79 +129,6 @@ export function buildOrderIntent(payload: OrderIntentBuildPayload): OrderIntent 
   };
 }
 
-// ─── Technical Indicator Calculations ─────────────────────────────────────
-
-export function calcEMA(data: number[], period: number): number[] {
-  const k = 2 / (period + 1);
-  const ema: number[] = [];
-  ema[0] = data[0];
-  for (let i = 1; i < data.length; i++) {
-    ema[i] = data[i] * k + ema[i - 1] * (1 - k);
-  }
-  return ema;
-}
-
-export function calcRSI(closes: number[], period = 14): number {
-  if (closes.length < period + 1) return 50;
-  let gains = 0, losses = 0;
-  for (let i = closes.length - period; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
-  }
-  const rs = gains / (losses || 0.0001);
-  return 100 - 100 / (1 + rs);
-}
-
-export function calcMACD(closes: number[]): { macd: number; signal: number; histogram: number } {
-  if (closes.length < 26) return { macd: 0, signal: 0, histogram: 0 };
-  const ema12 = calcEMA(closes, 12);
-  const ema26 = calcEMA(closes, 26);
-  const macdLine = ema12.map((v, i) => v - ema26[i]);
-  const signal = calcEMA(macdLine.slice(-9), 9);
-  const macdVal = macdLine[macdLine.length - 1];
-  const signalVal = signal[signal.length - 1];
-  return { macd: macdVal, signal: signalVal, histogram: macdVal - signalVal };
-}
-
-export function calcBollingerBands(closes: number[], period = 20, multiplier = 2) {
-  if (closes.length < period) return { upper: 0, middle: 0, lower: 0 };
-  const slice = closes.slice(-period);
-  const middle = slice.reduce((a, b) => a + b, 0) / period;
-  const variance = slice.reduce((a, b) => a + Math.pow(b - middle, 2), 0) / period;
-  const std = Math.sqrt(variance);
-  return { upper: middle + multiplier * std, middle, lower: middle - multiplier * std };
-}
-
-export function calcATR(candles: CandlePoint[], period = 14): number {
-  if (candles.length < period + 1) return 0;
-  const trs = candles.slice(-period - 1).map((c, i, arr) => {
-    if (i === 0) return c.high - c.low;
-    const prev = arr[i - 1];
-    return Math.max(c.high - c.low, Math.abs(c.high - prev.close), Math.abs(c.low - prev.close));
-  });
-  return trs.slice(1).reduce((a, b) => a + b, 0) / period;
-}
-
-export function calcVolumeAvg(candles: CandlePoint[], period = 20): number {
-  const slice = candles.slice(-period);
-  return slice.reduce((a, b) => a + b.volume, 0) / slice.length;
-}
-
-export function calcStochRSI(closes: number[], period = 14): number {
-  if (closes.length < period * 2) return 50;
-  const rsiValues: number[] = [];
-  for (let i = period; i < closes.length; i++) {
-    rsiValues.push(calcRSI(closes.slice(0, i + 1), period));
-  }
-  const slice = rsiValues.slice(-period);
-  const minRSI = Math.min(...slice);
-  const maxRSI = Math.max(...slice);
-  const currentRSI = slice[slice.length - 1];
-  if (maxRSI === minRSI) return 50;
-  return ((currentRSI - minRSI) / (maxRSI - minRSI)) * 100;
-}
-
 // ─── AI Signal Engine ─────────────────────────────────────────────────────
 
 export function detectMarketRegime(candles: CandlePoint[]): 'TRENDING' | 'RANGING' | 'VOLATILE' {
@@ -233,6 +166,9 @@ export function detectMarketRegime(candles: CandlePoint[]): 'TRENDING' | 'RANGIN
   // 4. Default: ranging/consolidation
   return 'RANGING';
 }
+
+// ─── AI Signal Engine ─────────────────────────────────────────────────────
+
 
 export function generateSignal(candles: CandlePoint[]): TradeSignal {
   const closes = candles.map(c => c.close);

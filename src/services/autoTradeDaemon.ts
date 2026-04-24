@@ -1,6 +1,6 @@
 import { useStore } from '../store/useStore';
 import { HeadlessBotService, type HeadlessBotState, type HeadlessBotActions, type HeadlessBotLogger } from './headlessBot';
-import type { AutoTradeLog, TradeSignal } from '../types';
+import type { TradeSignal } from '../types';
 
 /**
  * Desktop/UI Adapter
@@ -55,28 +55,27 @@ const mapStoreToHeadlessState = (): HeadlessBotState => {
   };
 };
 
-// Actions Mapping: HeadlessBotActions → Zustand Actions
-const mapStoreActions = (): HeadlessBotActions => {
-  const store = useStore.getState();
-  return {
-    setAutoTradeMode: (mode) => store.setAutoTradeMode(mode),
-    setAutoTradeRunning: (running) => store.setAutoTradeRunning(running),
-    addAutoTradeLog: (log) => store.addAutoTradeLog(log),
-    updateAutoTradeLog: (id, updates) => store.updateAutoTradeLog(id, updates),
-    addOrder: (order) => store.addOrder(order),
-    addTradeLesson: (lesson) => store.addTradeLesson(lesson),
-    setSignal: (symbol: string, signal: TradeSignal) => store.setSignal?.(symbol, signal),
-  };
-};
-
 class DesktopAutoTradeAdapter {
   private readonly botService: HeadlessBotService;
-  private readonly store = useStore;
 
   constructor() {
+    // IMPORTANT: Pass a function that creates fresh actions on every call.
+    // Zustand action references are stable, but wrapping ensures we always
+    // read from the latest store state for any future-proofing.
+    const freshActions: HeadlessBotActions = {
+      setAutoTradeMode: (mode) => useStore.getState().setAutoTradeMode(mode),
+      setAutoTradeRunning: (running) => useStore.getState().setAutoTradeRunning(running),
+      addAutoTradeLog: (log) => useStore.getState().addAutoTradeLog(log),
+      updateAutoTradeLog: (id, updates) => useStore.getState().updateAutoTradeLog(id, updates),
+      addOrder: (order) => useStore.getState().addOrder(order),
+      removeOrder: (id) => useStore.getState().removeOrder(id),
+      addTradeLesson: (lesson) => useStore.getState().addTradeLesson(lesson),
+      setSignal: (symbol: string, signal: TradeSignal) => useStore.getState().setSignal?.(symbol, signal),
+    };
+
     this.botService = new HeadlessBotService({
       getState: mapStoreToHeadlessState,
-      actions: mapStoreActions(),
+      actions: freshActions,
       logger: new DesktopAdapterLogger(),
       tickIntervalMs: 30_000,
       pnlCheckIntervalMs: 15_000,
@@ -88,7 +87,6 @@ class DesktopAutoTradeAdapter {
    * Corresponds to the old autoTradeDaemon.start() behavior.
    */
   public start(): void {
-    console.log('[DesktopAutoTradeAdapter] Starting via HeadlessBotService');
     this.botService.start();
   }
 
@@ -97,7 +95,6 @@ class DesktopAutoTradeAdapter {
    * Corresponds to the old autoTradeDaemon.stop() behavior.
    */
   public stop(): void {
-    console.log('[DesktopAutoTradeAdapter] Stopping HeadlessBotService');
     this.botService.stop();
   }
 

@@ -28,7 +28,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         configure: (proxy) => {
-          proxy.on('error', (err) => {
+          proxy.on('error', (err: Error) => {
             console.error('[Vite Proxy] Contract API Error:', err.message);
           });
         },
@@ -38,7 +38,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         configure: (proxy) => {
-          proxy.on('error', (err) => {
+          proxy.on('error', (err: Error) => {
             console.error('[Vite Proxy] Private API Error:', err.message);
           });
         },

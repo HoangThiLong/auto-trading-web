@@ -232,6 +232,7 @@ export async function analyzeWithAI(
       if (criticId === 'gemini') rawCritic = await callGemini(criticKey, criticPrompt);
       else if (criticId === 'groq') rawCritic = await callGroq(criticKey, criticPrompt);
       else if (criticId === 'openrouter') rawCritic = await callOpenRouter(criticKey, criticPrompt);
+      else if (criticId === 'together') rawCritic = await callTogether(criticKey, criticPrompt);
       
       const parsedCritic = parseAiResponse(rawCritic);
       const criticTime = performance.now() - cStart;
@@ -287,10 +288,9 @@ interface PredictionRecord {
 
 const predictionHistory: PredictionRecord[] = [];
 
-export function recordPredictionOutcome(outcome: PredictionRecord['outcome'], profit: number) {
-  // In a real implementation, we'd store this by ID - for now we'll just maintain a history
+export function recordPredictionOutcome(prediction: AiAnalysisResult, outcome: PredictionRecord['outcome'], profit: number) {
   const record: PredictionRecord = {
-    prediction: null as any, // We'd need to store the original prediction with this ID
+    prediction,
     outcome,
     profitLoss: profit,
     timestamp: Date.now(),

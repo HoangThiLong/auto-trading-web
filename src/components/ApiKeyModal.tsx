@@ -1,12 +1,19 @@
-import { useState } from 'react';
-import { fetchAccountInfo } from '../services/mexcApi';
+import { useState, useEffect } from 'react';
+import { fetchAccountInfo, setRuntimeMexcNetwork } from '../services/mexcApi';
 import { AI_PROVIDERS, type AiProviderId } from '../types';
 import toast from 'react-hot-toast';
 import {
   X, Key, Brain, Shield, Eye, EyeOff, ExternalLink,
-  CheckCircle, XCircle, Wifi, AlertTriangle, Zap,
+  CheckCircle, XCircle, Wifi, AlertTriangle, Zap, Bot,
 } from 'lucide-react';
 import { useApiKeyModalState } from '../store/hooks';
+import { useStore } from '../store/useStore';
+
+/** Mask an API key for display: show first 4 chars + last 4 chars */
+function maskKey(key: string | undefined): string {
+  if (!key || key.length < 8) return '••••••••';
+  return `${key.slice(0, 4)}...${key.slice(-4)}`;
+}
 
 export default function ApiKeyModal() {
   const {
@@ -16,13 +23,23 @@ export default function ApiKeyModal() {
     mexcNetwork, setMexcNetwork,
   } = useApiKeyModalState();
 
-  const [tab, setTab] = useState<'mexc' | 'ai' | 'security'>('mexc');
+  const [tab, setTab] = useState<'mexc' | 'ai' | 'telegram' | 'security'>('mexc');
   const [apiKey, setApiKey] = useState(credentials?.apiKey || '');
   const [secretKey, setSecretKey] = useState(credentials?.secretKey || '');
   const [network, setNetwork] = useState<'live' | 'demo'>(mexcNetwork || 'live');
   const [showSecret, setShowSecret] = useState(false);
   const [testing, setTesting] = useState(false);
   const [mexcTouched, setMexcTouched] = useState(false);
+
+  // ── Hydration sync: re-populate local state when zustand persist rehydrates ──
+  useEffect(() => {
+    if (credentials?.apiKey && !apiKey) setApiKey(credentials.apiKey);
+    if (credentials?.secretKey && !secretKey) setSecretKey(credentials.secretKey);
+  }, [credentials]);
+
+  useEffect(() => {
+    if (mexcNetwork) setNetwork(mexcNetwork);
+  }, [mexcNetwork]);
 
   // AI keys state
   const [aiKeys, setAiKeys] = useState<Record<AiProviderId | 'cryptopanic', string>>({
@@ -37,6 +54,42 @@ export default function ApiKeyModal() {
     aiCredentials?.preferredProvider || 'gemini'
   );
 
+  useEffect(() => {
+    if (aiCredentials) {
+      setAiKeys({
+        gemini: aiCredentials.gemini || '',
+        groq: aiCredentials.groq || '',
+        openrouter: aiCredentials.openrouter || '',
+        together: aiCredentials.together || '',
+        cryptopanic: aiCredentials.cryptopanic || '',
+      });
+      if (aiCredentials.preferredProvider) {
+        setPreferredProvider(aiCredentials.preferredProvider);
+      }
+    }
+  }, [aiCredentials]);
+
+  // Telegram keys state
+  const telegramCreds = useStore((state) => state.telegramCredentials);
+  const setTelegramCreds = useStore((state) => state.setTelegramCredentials);
+
+  const [telegramBotToken, setTelegramBotToken] = useState(telegramCreds?.botToken || '');
+  const [telegramChatId, setTelegramChatId] = useState(telegramCreds?.adminChatId || '');
+
+  useEffect(() => {
+    if (telegramCreds?.botToken && !telegramBotToken) setTelegramBotToken(telegramCreds.botToken);
+    if (telegramCreds?.adminChatId && !telegramChatId) setTelegramChatId(telegramCreds.adminChatId);
+  }, [telegramCreds]);
+
+  const saveTelegramKeys = () => {
+    if (!telegramBotToken.trim() || !telegramChatId.trim()) {
+      toast.error('Vui lòng nhập Bot Token và Chat ID');
+      return;
+    }
+    setTelegramCreds({ botToken: telegramBotToken, adminChatId: telegramChatId });
+    toast.success('✅ Đã lưu cấu hình Telegram!');
+  };
+
   if (!apiModalOpen) return null;
 
   const isApiKeyInvalid = mexcTouched && !apiKey.trim();
@@ -50,20 +103,32 @@ export default function ApiKeyModal() {
     }
 
     setTesting(true);
+    // IMPORTANT: Set runtime network switching immediately so signed requests hit correct endpoint
+    setRuntimeMexcNetwork(network);
+
     try {
-      const info = await fetchAccountInfo(apiKey, secretKey);
+      // First, save credentials with the selected network
       setCredentials({ apiKey, secretKey, mexcNetwork: network });
       setMexcNetwork(network);
+
+      // Test the connection by fetching account info
+      const info = await fetchAccountInfo(apiKey, secretKey);
+
+      // ONLY set connected=true if we got a valid authenticated response
       if (info) {
         setIsApiConnected(true);
         toast.success('✅ MEXC API kết nối thành công!');
       } else {
+        // API call returned null/error - reset connected state
         setIsApiConnected(false);
         toast('⚠️ API key đã lưu — dữ liệu thị trường hoạt động bình thường', { duration: 5000 });
       }
-    } catch {
-      setCredentials({ apiKey, secretKey, mexcNetwork: network });
-      toast.error('Không thể kết nối MEXC. Kiểm tra lại API key.');
+    } catch (err: any) {
+      // IMPORTANT: On any error, reset connection state to false
+      setIsApiConnected(false);
+      // Keep credentials saved so user can edit/fix them
+      console.error('[API Modal] Connection test failed:', err);
+      toast.error(`Không thể kết nối MEXC: ${err?.message || 'Lỗi không xác định'}`);
     } finally {
       setTesting(false);
     }
@@ -113,6 +178,7 @@ export default function ApiKeyModal() {
           {([
             { id: 'mexc', icon: Wifi, label: 'MEXC API' },
             { id: 'ai', icon: Brain, label: 'AI Models' },
+            { id: 'telegram', icon: Bot, label: 'Telegram' },
             { id: 'security', icon: Shield, label: 'Bảo mật' },
           ] as const).map(({ id, icon: Icon, label }) => (
             <button
@@ -131,14 +197,39 @@ export default function ApiKeyModal() {
           {/* ── MEXC Tab ── */}
           {tab === 'mexc' && (
             <>
-              {/* Status */}
-              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-base ${
-                credentials
+              {/* Status — 3 states: verified / saved / empty */}
+              <div className={`rounded-xl border px-4 py-3 ${
+                credentials && useStore.getState().isApiConnected
                   ? 'border-[rgba(14,203,129,0.4)] bg-[rgba(14,203,129,0.12)] text-[#95f4ca]'
+                  : credentials
+                  ? 'border-[rgba(255,184,46,0.4)] bg-[rgba(255,184,46,0.12)] text-[#ffd77d]'
                   : 'border-[var(--border)] bg-[rgba(22,27,39,0.75)] text-[var(--text-muted)]'
               }`}>
-                {credentials ? <CheckCircle className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-                {credentials ? 'MEXC API Key đã được lưu' : 'Chưa cấu hình MEXC API Key'}
+                <div className="flex items-center gap-3 text-base">
+                  {credentials && useStore.getState().isApiConnected
+                    ? <CheckCircle className="h-5 w-5" />
+                    : credentials
+                    ? <AlertTriangle className="h-5 w-5" />
+                    : <XCircle className="h-5 w-5" />}
+                  {credentials && useStore.getState().isApiConnected
+                    ? 'API Key đã xác minh — Kết nối thành công'
+                    : credentials
+                    ? 'API Key đã lưu — Chưa xác minh kết nối'
+                    : 'Chưa cấu hình MEXC API Key'}
+                </div>
+                {credentials && (
+                  <div className="mt-2 flex flex-wrap gap-3 border-t border-[rgba(255,255,255,0.08)] pt-2 text-xs">
+                    <span className="font-mono opacity-80">
+                      <span className="text-[var(--text-muted)]">API: </span>{maskKey(credentials.apiKey)}
+                    </span>
+                    <span className="font-mono opacity-80">
+                      <span className="text-[var(--text-muted)]">Secret: </span>{maskKey(credentials.secretKey)}
+                    </span>
+                    <span className="opacity-60">
+                      {credentials.mexcNetwork === 'demo' ? '🧪 Demo' : '🟢 Live'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Warning */}
@@ -174,12 +265,12 @@ export default function ApiKeyModal() {
                     }`}
                   >
                     <span className={`h-2 w-2 rounded-full ${network === 'demo' ? 'bg-[#3b82f6]' : 'bg-[var(--border)]'}`} />
-                    Demo (Testnet)
+                    Demo (Giả lập)
                   </button>
                 </div>
                 {network === 'demo' && (
                   <p className="mt-3 text-xs text-amber-400">
-                    ⚠️ API Key của tài khoản Demo được tạo riêng trên trang Testnet của MEXC, không dùng chung với Live.
+                    ⚠️ MEXC không có API Testnet tách riêng cho Futures; Demo và Live dùng chung hệ API/key, chỉ khác chế độ tài khoản bạn chọn trên sàn.
                   </p>
                 )}
               </div>
@@ -294,6 +385,26 @@ export default function ApiKeyModal() {
                   <div className="leading-relaxed">Nhập ít nhất 1 AI API key để kích hoạt phân tích AI. Hệ thống sẽ tự động chuyển sang provider khác khi hết quota.</div>
                 </div>
               </div>
+
+              {/* AI Keys Status Summary */}
+              {aiCredentials && Object.values(aiCredentials).some(v => typeof v === 'string' && v.length > 0) && (
+                <div className="flex items-center gap-3 rounded-xl border border-[rgba(14,203,129,0.4)] bg-[rgba(14,203,129,0.08)] px-4 py-3 text-sm text-[#95f4ca]">
+                  <CheckCircle className="h-5 w-5 shrink-0" />
+                  <div>
+                    <div className="font-semibold">AI đã cấu hình</div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-xs opacity-80">
+                      {aiCredentials.gemini && <span className="rounded-full bg-[rgba(66,133,244,0.2)] px-2 py-0.5">Gemini ✓</span>}
+                      {aiCredentials.groq && <span className="rounded-full bg-[rgba(245,80,54,0.2)] px-2 py-0.5">Groq ✓</span>}
+                      {aiCredentials.openrouter && <span className="rounded-full bg-[rgba(124,58,237,0.2)] px-2 py-0.5">OpenRouter ✓</span>}
+                      {aiCredentials.together && <span className="rounded-full bg-[rgba(5,150,105,0.2)] px-2 py-0.5">Together ✓</span>}
+                      {aiCredentials.cryptopanic && <span className="rounded-full bg-[rgba(249,115,22,0.2)] px-2 py-0.5">CryptoPanic ✓</span>}
+                      {aiCredentials.preferredProvider && (
+                        <span className="text-[var(--text-muted)]">• Ưu tiên: {aiCredentials.preferredProvider}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Priority selector */}
               <div className="premium-section-card rounded-2xl p-5">
@@ -421,6 +532,63 @@ export default function ApiKeyModal() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+          {/* ── Telegram Tab ── */}
+          {tab === 'telegram' && (
+            <div className="space-y-5">
+              <div className="flex items-start gap-3 rounded-xl border border-[rgba(0,82,255,0.35)] bg-[rgba(0,82,255,0.12)] p-4 text-sm text-[#b7ceff]">
+                <Zap className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <div className="mb-1 font-bold">Nhận thông báo qua Telegram</div>
+                  <div className="leading-relaxed">Nhập Bot Token và Chat ID để nhận thông báo khi có lệnh mới hoặc trạng thái bot thay đổi.</div>
+                </div>
+              </div>
+
+              {telegramCreds?.botToken && telegramCreds?.adminChatId && (
+                <div className="flex items-center gap-3 rounded-xl border border-[rgba(14,203,129,0.4)] bg-[rgba(14,203,129,0.08)] px-4 py-3 text-sm text-[#95f4ca]">
+                  <CheckCircle className="h-5 w-5 shrink-0" />
+                  <div>
+                    <div className="font-semibold">Telegram đã cấu hình</div>
+                    <div className="mt-1 flex gap-3 text-xs font-mono opacity-80">
+                      <span>Bot: {maskKey(telegramCreds.botToken)}</span>
+                      <span>Chat: {telegramCreds.adminChatId}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="premium-section-card space-y-4 rounded-2xl p-6">
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-[var(--text-muted)]">Bot Token</label>
+                  <input
+                    id="telegram-bot-token-input"
+                    type="text"
+                    value={telegramBotToken}
+                    onChange={e => setTelegramBotToken(e.target.value)}
+                    placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz..."
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-main)] px-4 py-3 font-mono text-sm text-white placeholder-[var(--text-muted)] transition-all focus:border-[var(--color-brand)] focus:outline-none focus:ring-2"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-[var(--text-muted)]">Admin Chat ID</label>
+                  <input
+                    id="telegram-chat-id-input"
+                    type="text"
+                    value={telegramChatId}
+                    onChange={e => setTelegramChatId(e.target.value)}
+                    placeholder="123456789"
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-main)] px-4 py-3 font-mono text-sm text-white placeholder-[var(--text-muted)] transition-all focus:border-[var(--color-brand)] focus:outline-none focus:ring-2"
+                  />
+                </div>
+                <button
+                  id="save-telegram-keys-button"
+                  onClick={saveTelegramKeys}
+                  className="coinbase-pill-btn flex w-full items-center justify-center gap-2 bg-[var(--color-brand)] py-3.5 text-base font-bold text-white shadow-[0_12px_26px_rgba(0,82,255,0.35)] transition-all hover:bg-[var(--color-brand-hover)]"
+                >
+                  <Bot className="h-5 w-5" /> Lưu cấu hình Telegram
+                </button>
               </div>
             </div>
           )}

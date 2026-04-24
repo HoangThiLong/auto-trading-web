@@ -10,6 +10,7 @@ import type {
   NewsItem,
   PendingOrder,
   TradeSignal,
+  TelegramCredentials,
 } from '../types';
 import { encryptCredentials, decryptCredentials, isElectronSecureMode } from '../utils/credentialCrypto';
 import { createMarketDataSlice, type MarketDataSlice } from './slices/marketDataSlice';
@@ -48,11 +49,15 @@ interface AppState extends MarketDataSlice, UiSlice {
   marketSentiment: MarketSentiment;
   newsLoading: boolean;
 
+  // Telegram
+  telegramCredentials: TelegramCredentials | null;
+
   // Actions
   setCredentials: (creds: ApiCredentials | null) => void;
   setIsApiConnected: (v: boolean) => void;
   setAiCredentials: (creds: AiModelCredentials | null) => void;
   setMexcNetwork: (network: 'live' | 'demo') => void;
+  setTelegramCredentials: (creds: TelegramCredentials | null) => void;
   setSignal: (symbol: string, signal: TradeSignal) => void;
   setIsAnalyzing: (v: boolean) => void;
   setCurrentAiProvider: (provider: string) => void;
@@ -78,7 +83,9 @@ interface AppState extends MarketDataSlice, UiSlice {
 type SecureCredentialPayload = {
   credentials: ApiCredentials | null;
   aiCredentials: AiModelCredentials | null;
+  telegramCredentials: TelegramCredentials | null;
   mexcNetwork: 'live' | 'demo';
+  isApiConnected: boolean;
 };
 
 type ElectronApiBridge = {
@@ -105,7 +112,7 @@ const syncSecureCredentials = async (payload: SecureCredentialPayload) => {
   if (!electronApi) return;
 
   try {
-    if (!payload.credentials && !payload.aiCredentials) {
+    if (!payload.credentials && !payload.aiCredentials && !payload.telegramCredentials) {
       await electronApi.clearCredentials();
       return;
     }
@@ -216,22 +223,36 @@ export const useStore = create<AppState>()(
       news: [],
       marketSentiment: 'NEUTRAL',
       newsLoading: false,
+      telegramCredentials: null,
 
       setCredentials: (credentials) => {
         args[0]({ credentials });
         void syncSecureCredentials({
           credentials,
           aiCredentials: args[1]().aiCredentials,
+          telegramCredentials: args[1]().telegramCredentials,
           mexcNetwork: args[1]().mexcNetwork,
+          isApiConnected: args[1]().isApiConnected,
         });
       },
-      setIsApiConnected: (isApiConnected) => args[0]({ isApiConnected }),
+      setIsApiConnected: (isApiConnected) => {
+        args[0]({ isApiConnected });
+        void syncSecureCredentials({
+          credentials: args[1]().credentials,
+          aiCredentials: args[1]().aiCredentials,
+          telegramCredentials: args[1]().telegramCredentials,
+          mexcNetwork: args[1]().mexcNetwork,
+          isApiConnected,
+        });
+      },
       setAiCredentials: (aiCredentials) => {
         args[0]({ aiCredentials });
         void syncSecureCredentials({
           credentials: args[1]().credentials,
           aiCredentials,
+          telegramCredentials: args[1]().telegramCredentials,
           mexcNetwork: args[1]().mexcNetwork,
+          isApiConnected: args[1]().isApiConnected,
         });
       },
       setMexcNetwork: (mexcNetwork) => {
@@ -239,7 +260,19 @@ export const useStore = create<AppState>()(
         void syncSecureCredentials({
           credentials: args[1]().credentials,
           aiCredentials: args[1]().aiCredentials,
+          telegramCredentials: args[1]().telegramCredentials,
           mexcNetwork,
+          isApiConnected: args[1]().isApiConnected,
+        });
+      },
+      setTelegramCredentials: (telegramCredentials) => {
+        args[0]({ telegramCredentials });
+        void syncSecureCredentials({
+          credentials: args[1]().credentials,
+          aiCredentials: args[1]().aiCredentials,
+          telegramCredentials,
+          mexcNetwork: args[1]().mexcNetwork,
+          isApiConnected: args[1]().isApiConnected,
         });
       },
       setSignal: (symbol, signal) =>
@@ -280,7 +313,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'mexc-pro-v2',
-      storage: encryptedStorage,
+      storage: encryptedStorage as any,
       partialize: (state) => ({
         selectedSymbol: state.selectedSymbol,
         selectedInterval: state.selectedInterval,
@@ -296,8 +329,10 @@ export const useStore = create<AppState>()(
         // Sensitive fields — encrypted via encryptedStorage adapter
         credentials: state.credentials,
         aiCredentials: state.aiCredentials,
+        telegramCredentials: state.telegramCredentials,
         mexcNetwork: state.mexcNetwork,
-      }),
+        isApiConnected: state.isApiConnected,
+      }) as unknown as AppState,
     }
   )
 );
@@ -313,6 +348,9 @@ const hydrateSecureCredentials = async () => {
     useStore.setState({
       credentials: loaded.credentials ?? null,
       aiCredentials: loaded.aiCredentials ?? null,
+      telegramCredentials: loaded.telegramCredentials ?? null,
+      mexcNetwork: loaded.mexcNetwork ?? 'live',
+      isApiConnected: loaded.isApiConnected ?? false,
     });
   } catch (error) {
     console.error('[secure-credentials] Failed to load credentials:', error);

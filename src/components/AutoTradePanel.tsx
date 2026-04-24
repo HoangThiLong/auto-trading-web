@@ -311,6 +311,12 @@ export default function AutoTradePanel() {
                 ))}
               </div>
 
+              {autoTradeMode === 'live' && (autoTradeConfig.riskPercentPerTrade >= 3 || autoTradeConfig.minConfidence < 75) && (
+                <div className="rounded-xl border border-[rgba(255,184,46,0.42)] bg-[rgba(255,184,46,0.12)] p-3 text-xs text-[#ffd979]">
+                  Cảnh báo live mode: cấu hình hiện tại khá gắt. Nên giữ confidence cao hơn và risk thấp hơn trước khi chạy tiền thật.
+                </div>
+              )}
+
               <button
                 onClick={() => { clearAutoTradeLogs(); toast.success('Đã xóa lịch sử'); }}
                 className="w-full rounded-xl border border-[rgba(246,70,93,0.42)] py-2 text-xs text-[var(--color-danger)] transition-colors hover:bg-[rgba(246,70,93,0.16)]"

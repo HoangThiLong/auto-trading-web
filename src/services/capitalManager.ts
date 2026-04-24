@@ -173,13 +173,45 @@ export function calcDynamicTPSL(
   return { takeProfit, stopLoss, riskReward };
 }
 
+export function ensureValidTPSL(
+  entryPrice: number,
+  takeProfit: number,
+  stopLoss: number,
+  direction: 'LONG' | 'SHORT',
+  strength: TradeSignal['strength'],
+  winRate = 0.5,
+  atr = Math.abs(entryPrice) * 0.01,
+): { takeProfit: number; stopLoss: number; riskReward: number; usedFallback: boolean } {
+  const hasValidLevels = direction === 'LONG'
+    ? takeProfit > entryPrice && stopLoss < entryPrice
+    : takeProfit < entryPrice && stopLoss > entryPrice;
+
+  if (hasValidLevels) {
+    const risk = Math.abs(entryPrice - stopLoss);
+    const reward = Math.abs(takeProfit - entryPrice);
+    return {
+      takeProfit,
+      stopLoss,
+      riskReward: risk > 0 ? reward / risk : 1,
+      usedFallback: false,
+    };
+  }
+
+  const fallback = calcDynamicTPSL(entryPrice, Math.max(atr, entryPrice * 0.0025), direction, strength, winRate);
+  return {
+    ...fallback,
+    usedFallback: true,
+  };
+}
+
 /**
  * Calculate daily P&L from auto-trade logs.
  */
 export function calcDailyPnL(logs: { pnl?: number; timestamp: number }[]): number {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const todayStartUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
   return logs
-    .filter(l => l.timestamp >= todayStart.getTime() && l.pnl !== undefined)
+    .filter(l => l.timestamp >= todayStartUtc && l.pnl !== undefined)
     .reduce((sum, l) => sum + (l.pnl || 0), 0);
 }

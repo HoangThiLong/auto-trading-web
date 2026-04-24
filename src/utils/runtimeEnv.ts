@@ -1,5 +1,3 @@
-type ViteEnv = Record<string, unknown> | undefined;
-
 const normalize = (value: unknown): string | undefined => {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();

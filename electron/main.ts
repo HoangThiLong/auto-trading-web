@@ -5,7 +5,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 type SecureCredentialPayload = {
-  credentials: { apiKey: string; secretKey: string } | null;
+  credentials:
+    | {
+        apiKey: string;
+        secretKey: string;
+        mexcNetwork: 'live' | 'demo';
+      }
+    | null;
   aiCredentials:
     | {
         gemini?: string;
@@ -16,6 +22,14 @@ type SecureCredentialPayload = {
         preferredProvider?: 'gemini' | 'groq' | 'openrouter' | 'together';
       }
     | null;
+  telegramCredentials:
+    | {
+        botToken: string;
+        adminChatId: string;
+      }
+    | null;
+  mexcNetwork: 'live' | 'demo';
+  isApiConnected: boolean;
 };
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +41,9 @@ let timesfmProcess: ChildProcess | null = null;
 const defaultCredentialPayload = (): SecureCredentialPayload => ({
   credentials: null,
   aiCredentials: null,
+  telegramCredentials: null,
+  mexcNetwork: 'live',
+  isApiConnected: false,
 });
 
 const saveEncryptedCredentials = (payload: SecureCredentialPayload) => {
@@ -56,6 +73,9 @@ const loadEncryptedCredentials = (): SecureCredentialPayload => {
     return {
       credentials: parsed.credentials ?? null,
       aiCredentials: parsed.aiCredentials ?? null,
+      telegramCredentials: parsed.telegramCredentials ?? null,
+      mexcNetwork: parsed.mexcNetwork === 'demo' ? 'demo' : 'live',
+      isApiConnected: Boolean(parsed.isApiConnected),
     };
   } catch {
     return defaultCredentialPayload();
@@ -119,6 +139,11 @@ const startTimesfmSidecar = () => {
       cwd: path.dirname(backendScriptPath),
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      env: {
+        ...process.env,
+        TIMESFM_PORT: process.env.TIMESFM_PORT || '8010',
+        HF_HUB_DISABLE_SYMLINKS_WARNING: '1',
+      },
     });
 
     timesfmProcess = child;
@@ -172,8 +197,9 @@ const createMainWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   });
 

@@ -1,7 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 type SecureCredentialPayload = {
-  credentials: { apiKey: string; secretKey: string } | null;
+  credentials:
+    | {
+        apiKey: string;
+        secretKey: string;
+        mexcNetwork: 'live' | 'demo';
+      }
+    | null;
   aiCredentials:
     | {
         gemini?: string;
@@ -12,6 +18,14 @@ type SecureCredentialPayload = {
         preferredProvider?: 'gemini' | 'groq' | 'openrouter' | 'together';
       }
     | null;
+  telegramCredentials:
+    | {
+        botToken: string;
+        adminChatId: string;
+      }
+    | null;
+  mexcNetwork: 'live' | 'demo';
+  isApiConnected: boolean;
 };
 
 contextBridge.exposeInMainWorld('electronAPI', {

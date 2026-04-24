@@ -64,6 +64,10 @@ const settingsPanelSelector = (state: StoreState) => ({
   aiCredentials: state.aiCredentials,
   autoTradeMode: state.autoTradeMode,
   autoTradeConfig: state.autoTradeConfig,
+  credentials: state.credentials,
+  isApiConnected: state.isApiConnected,
+  telegramCredentials: state.telegramCredentials,
+  mexcNetwork: state.mexcNetwork,
 });
 
 const newsFeedSelector = (state: StoreState) => ({

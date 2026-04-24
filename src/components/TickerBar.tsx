@@ -32,7 +32,8 @@ export default function TickerBar() {
       ? p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : p >= 1 ? p.toFixed(4) : p.toFixed(6);
 
-  const nextFundingMs = funding?.nextSettleTime ? funding.nextSettleTime - Date.now() : null;
+  const nextFundingAt = funding?.nextSettleTime ?? funding?.nextFundingTime;
+  const nextFundingMs = nextFundingAt ? nextFundingAt - Date.now() : null;
   const nextFundingStr = nextFundingMs && nextFundingMs > 0
     ? `${Math.floor(nextFundingMs / 3600000).toString().padStart(2, '0')}:${Math.floor((nextFundingMs % 3600000) / 60000).toString().padStart(2, '0')}`
     : '--:--';
@@ -89,13 +90,13 @@ export default function TickerBar() {
         <div className={`text-2xl font-mono font-bold tracking-tight leading-tight ${isUp ? 'text-[var(--color-success)] drop-shadow-[0_0_8px_var(--color-success-dim)]' : 'text-[var(--color-danger)] drop-shadow-[0_0_8px_var(--color-danger-dim)]'}`}>
           {formatPrice(ticker.lastPrice)}
         </div>
-        <div className={`flex items-center gap-1.5 text-sm font-semibold mt-0.5 ${isUp ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
-          {isUp ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-          <span className="bg-[currentColor] bg-opacity-10 px-1 rounded">
+        <div className={`flex items-center gap-1.5 text-sm font-semibold mt-0.5`}>
+          {isUp ? <TrendingUp className="w-4 h-4 text-[#0ecb81]" /> : <TrendingDown className="w-4 h-4 text-[#f6465d]" />}
+          <span className={`px-1.5 py-0.5 rounded text-xs ${isUp ? 'bg-[#0ecb81]/15 text-[#0ecb81]' : 'bg-[#f6465d]/15 text-[#f6465d]'}`}>
             {isUp ? '+' : ''}{(ticker.riseFallRate * 100).toFixed(2)}%
           </span>
-          <span className="text-[var(--text-dim)] font-medium text-xs ml-1 bg-[var(--bg-surface-soft)] px-1.5 py-[2px] rounded">
-            {isUp ? '+' : ''}{ticker.riseFallValue.toFixed(2)}
+          <span className={`font-medium text-xs ml-1 bg-[var(--bg-surface-soft)] px-1.5 py-[2px] rounded ${isUp ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+            {isUp ? '+' : ''}{(ticker.riseFallValue ?? 0).toFixed(2)}
           </span>
         </div>
       </div>

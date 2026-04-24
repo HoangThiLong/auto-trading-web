@@ -259,6 +259,7 @@ describe('Nhóm 1: Kiểm thử Logic Giao dịch Cơ bản', () => {
       addAutoTradeLog: vi.fn(),
       updateAutoTradeLog: vi.fn(),
       addOrder: vi.fn(),
+      removeOrder: vi.fn(),
       addTradeLesson: vi.fn(),
       setSignal: vi.fn(),
     };
@@ -349,6 +350,7 @@ describe('Nhóm 1: Kiểm thử Logic Giao dịch Cơ bản', () => {
       addAutoTradeLog: vi.fn(),
       updateAutoTradeLog: vi.fn(),
       addOrder: vi.fn(),
+      removeOrder: vi.fn(),
       addTradeLesson: vi.fn(),
       setSignal: vi.fn(),
     };
@@ -417,6 +419,7 @@ describe('Nhóm 1: Kiểm thử Logic Giao dịch Cơ bản', () => {
       addAutoTradeLog: vi.fn(),
       updateAutoTradeLog: vi.fn(),
       addOrder: vi.fn(),
+      removeOrder: vi.fn(),
       addTradeLesson: vi.fn(),
       setSignal: vi.fn(),
     };
@@ -531,7 +534,7 @@ describe('Nhóm 2: Kiểm thử An toàn Ranh giới', () => {
     vi.mocked(calcPositionSize).mockClear();
     
     // Force calcPositionSize to return 0 (insufficient balance)
-    vi.mocked(calcPositionSize).mockReturnValue(0);
+    vi.mocked(calcPositionSize).mockReturnValueOnce(0);
     
     const state = {
       autoTradeMode: 'simulation' as const,
@@ -569,6 +572,7 @@ describe('Nhóm 2: Kiểm thử An toàn Ranh giới', () => {
       addAutoTradeLog: vi.fn(),
       updateAutoTradeLog: vi.fn(),
       addOrder: vi.fn(),
+      removeOrder: vi.fn(),
       addTradeLesson: vi.fn(),
       setSignal: vi.fn(),
     };
@@ -646,6 +650,7 @@ describe('Nhóm 2: Kiểm thử An toàn Ranh giới', () => {
       addAutoTradeLog: vi.fn(),
       updateAutoTradeLog: vi.fn(),
       addOrder: vi.fn(),
+      removeOrder: vi.fn(),
       addTradeLesson: vi.fn(),
       setSignal: vi.fn(),
     };
@@ -670,5 +675,401 @@ describe('Nhóm 2: Kiểm thử An toàn Ranh giới', () => {
     // Bot should stop due to daily loss limit exceeded
     expect(actions.setAutoTradeMode).toHaveBeenCalledWith('off');
     expect(actions.setAutoTradeRunning).toHaveBeenCalledWith(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nhóm 3: Regression Tests cho Bug #2, #7, #8
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Nhóm 3: Regression Tests — Bug #2, #7, #8', () => {
+  beforeEach(() => { clearMocks(); });
+
+  it('Bug #2 Regression: Pending order bị xóa khi SL hit (LONG)', async () => {
+    const { HeadlessBotService } = await import('../headlessBot');
+
+    const pendingOrderId = 'sim_intent_abc123';
+    const intentId = 'intent_abc123';
+
+    const existingLog: AutoTradeLog = {
+      id: 'test_log_sl_cleanup',
+      intentId,
+      timestamp: Date.now() - 60000,
+      symbol: 'BTC_USDT',
+      mode: 'simulation' as const,
+      side: 'LONG' as const,
+      entry: 65000,
+      tp: 67000,
+      sl: 63700,
+      quantity: 0.01,
+      leverage: 10,
+      confidence: 75,
+      winRate: 55,
+      aiProvider: 'test',
+      status: 'OPENED' as const,
+    };
+
+    const state = {
+      autoTradeMode: 'simulation' as const,
+      autoTradeRunning: true,
+      autoTradeConfig: {
+        minConfidence: 70,
+        riskPercentPerTrade: 1,
+        maxConcurrentOrders: 3,
+        dailyLossLimit: 50,
+        trailingStop: false,
+        newsFilter: false,
+        quietHours: null,
+        symbols: ['BTC_USDT'],
+        scanAllMarket: false,
+      },
+      autoTradeLogs: [existingLog],
+      pendingOrders: [
+        {
+          id: pendingOrderId,
+          intentId,
+          symbol: 'BTC_USDT',
+          side: 'LONG' as const,
+          type: 'MARKET' as const,
+          price: 65000,
+          quantity: 0.01,
+          leverage: 10,
+          stopLoss: 63700,
+          takeProfit: 67000,
+          status: 'PENDING' as const,
+          createdAt: Date.now() - 60000,
+          isSimulation: true,
+        },
+      ],
+      tradeLessons: [] as string[],
+      credentials: null,
+      aiCredentials: null,
+      signals: {},
+      tickers: [
+        { symbol: 'BTC_USDT', lastPrice: 62000, bid1: 61990, ask1: 62010, volume24: 500000, amount24: 30000000, holdVol: 100000, lower24Price: 60000, high24Price: 67000, riseFallRate: -0.03, riseFallValue: -1950, indexPrice: 62000, fairPrice: 62000, fundingRate: 0.0001, timestamp: Date.now() },
+      ],
+      contracts: [{ symbol: 'BTC_USDT', contractSize: 0.01 }] as unknown as ContractInfo[],
+      news: [],
+      marketSentiment: 'NEUTRAL' as const,
+      accountBalance: null,
+      demoBalance: 10000,
+    };
+
+    const actions = {
+      setAutoTradeMode: vi.fn(),
+      setAutoTradeRunning: vi.fn(),
+      addAutoTradeLog: vi.fn(),
+      updateAutoTradeLog: vi.fn(),
+      addOrder: vi.fn(),
+      removeOrder: vi.fn(),
+      addTradeLesson: vi.fn(),
+      setSignal: vi.fn(),
+    };
+
+    const bot = new HeadlessBotService({
+      getState: () => state,
+      actions,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+      tickIntervalMs: 30000,
+      pnlCheckIntervalMs: 15000,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (bot as any).checkSimulationPnL();
+
+    // SL hit → removeOrder must be called with pending order ID
+    expect(actions.updateAutoTradeLog).toHaveBeenCalledWith('test_log_sl_cleanup', expect.objectContaining({
+      status: 'SL_HIT',
+    }));
+    expect(actions.removeOrder).toHaveBeenCalledWith(pendingOrderId);
+  });
+
+  it('Bug #2 Regression: Pending order bị xóa khi TP hit (SHORT)', async () => {
+    const { HeadlessBotService } = await import('../headlessBot');
+
+    const pendingOrderId = 'sim_intent_tp_short';
+    const intentId = 'intent_tp_short';
+
+    const existingLog: AutoTradeLog = {
+      id: 'test_log_tp_short',
+      intentId,
+      timestamp: Date.now() - 60000,
+      symbol: 'ETH_USDT',
+      mode: 'simulation' as const,
+      side: 'SHORT' as const,
+      entry: 3500,
+      tp: 3300,
+      sl: 3650,
+      quantity: 1,
+      leverage: 10,
+      confidence: 80,
+      winRate: 60,
+      aiProvider: 'test',
+      status: 'OPENED' as const,
+    };
+
+    const state = {
+      autoTradeMode: 'simulation' as const,
+      autoTradeRunning: true,
+      autoTradeConfig: {
+        minConfidence: 70,
+        riskPercentPerTrade: 1,
+        maxConcurrentOrders: 3,
+        dailyLossLimit: 50,
+        trailingStop: false,
+        newsFilter: false,
+        quietHours: null,
+        symbols: ['ETH_USDT'],
+        scanAllMarket: false,
+      },
+      autoTradeLogs: [existingLog],
+      pendingOrders: [
+        {
+          id: pendingOrderId,
+          intentId,
+          symbol: 'ETH_USDT',
+          side: 'SHORT' as const,
+          type: 'MARKET' as const,
+          price: 3500,
+          quantity: 1,
+          leverage: 10,
+          stopLoss: 3650,
+          takeProfit: 3300,
+          status: 'PENDING' as const,
+          createdAt: Date.now() - 60000,
+          isSimulation: true,
+        },
+      ],
+      tradeLessons: [] as string[],
+      credentials: null,
+      aiCredentials: null,
+      signals: {},
+      tickers: [
+        { symbol: 'ETH_USDT', lastPrice: 3200, bid1: 3190, ask1: 3210, volume24: 300000, amount24: 10000000, holdVol: 50000, lower24Price: 3100, high24Price: 3700, riseFallRate: -0.05, riseFallValue: -175, indexPrice: 3200, fairPrice: 3200, fundingRate: 0.0001, timestamp: Date.now() },
+      ],
+      contracts: [{ symbol: 'ETH_USDT', contractSize: 0.1 }] as unknown as ContractInfo[],
+      news: [],
+      marketSentiment: 'NEUTRAL' as const,
+      accountBalance: null,
+      demoBalance: 10000,
+    };
+
+    const actions = {
+      setAutoTradeMode: vi.fn(),
+      setAutoTradeRunning: vi.fn(),
+      addAutoTradeLog: vi.fn(),
+      updateAutoTradeLog: vi.fn(),
+      addOrder: vi.fn(),
+      removeOrder: vi.fn(),
+      addTradeLesson: vi.fn(),
+      setSignal: vi.fn(),
+    };
+
+    const bot = new HeadlessBotService({
+      getState: () => state,
+      actions,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+      tickIntervalMs: 30000,
+      pnlCheckIntervalMs: 15000,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (bot as any).checkSimulationPnL();
+
+    // SHORT + price 3200 < TP 3300 → TP hit for SHORT
+    expect(actions.updateAutoTradeLog).toHaveBeenCalledWith('test_log_tp_short', expect.objectContaining({
+      status: 'TP_HIT',
+    }));
+    expect(actions.removeOrder).toHaveBeenCalledWith(pendingOrderId);
+  });
+
+  it('Bug #8 Regression: isDuplicateIntent cho phép retry sau 60 giây', async () => {
+    const { HeadlessBotService } = await import('../headlessBot');
+
+    const intentId = 'intent_old_123';
+
+    // Log cũ hơn 60s, status TP_HIT → không được block
+    const oldLog: AutoTradeLog = {
+      id: 'log_old_1',
+      intentId,
+      timestamp: Date.now() - 120_000, // 2 phút trước
+      symbol: 'BTC_USDT',
+      mode: 'simulation' as const,
+      side: 'LONG' as const,
+      entry: 65000,
+      tp: 67000,
+      sl: 63700,
+      quantity: 0.01,
+      leverage: 10,
+      confidence: 75,
+      winRate: 55,
+      aiProvider: 'test',
+      status: 'TP_HIT' as const,
+      pnl: 20,
+    };
+
+    const state = {
+      autoTradeMode: 'simulation' as const,
+      autoTradeRunning: true,
+      autoTradeConfig: {
+        minConfidence: 70,
+        riskPercentPerTrade: 1,
+        maxConcurrentOrders: 3,
+        dailyLossLimit: 50,
+        trailingStop: false,
+        newsFilter: false,
+        quietHours: null,
+        symbols: ['BTC_USDT'],
+        scanAllMarket: false,
+      },
+      autoTradeLogs: [oldLog],
+      pendingOrders: [],
+      tradeLessons: [] as string[],
+      credentials: null,
+      aiCredentials: null,
+      signals: {},
+      tickers: [
+        { symbol: 'BTC_USDT', lastPrice: 65000, bid1: 64990, ask1: 65010, volume24: 500000, amount24: 30000000, holdVol: 100000, lower24Price: 63000, high24Price: 67000, riseFallRate: 0.03, riseFallValue: 1950, indexPrice: 65000, fairPrice: 65000, fundingRate: 0.0001, timestamp: Date.now() },
+      ],
+      contracts: [{ symbol: 'BTC_USDT', contractSize: 0.01 }] as unknown as ContractInfo[],
+      news: [],
+      marketSentiment: 'NEUTRAL' as const,
+      accountBalance: null,
+      demoBalance: 10000,
+    };
+
+    const actions = {
+      setAutoTradeMode: vi.fn(),
+      setAutoTradeRunning: vi.fn(),
+      addAutoTradeLog: vi.fn(),
+      updateAutoTradeLog: vi.fn(),
+      addOrder: vi.fn(),
+      removeOrder: vi.fn(),
+      addTradeLesson: vi.fn(),
+      setSignal: vi.fn(),
+    };
+
+    const bot = new HeadlessBotService({
+      getState: () => state,
+      actions,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+      tickIntervalMs: 30000,
+      pnlCheckIntervalMs: 15000,
+    });
+
+    await bot.runSingleTick();
+
+    // Old intent should NOT block new trade → addAutoTradeLog should be called
+    expect(actions.addAutoTradeLog).toHaveBeenCalled();
+  });
+
+  it('Bug #8 Regression: isDuplicateIntent block intent gần đây (<60s)', async () => {
+    const { HeadlessBotService } = await import('../headlessBot');
+
+    const intentId = 'intent_recent_456';
+
+    // Log rất gần đây (5s), status TP_HIT → vẫn phải bị block
+    const recentLog: AutoTradeLog = {
+      id: 'log_recent_1',
+      intentId,
+      timestamp: Date.now() - 5_000, // 5 giây trước
+      symbol: 'BTC_USDT',
+      mode: 'simulation' as const,
+      side: 'LONG' as const,
+      entry: 65000,
+      tp: 67000,
+      sl: 63700,
+      quantity: 0.01,
+      leverage: 10,
+      confidence: 75,
+      winRate: 55,
+      aiProvider: 'test',
+      status: 'TP_HIT' as const,
+      pnl: 20,
+    };
+
+    // Mock buildOrderIntentInWorker to return the SAME intentId
+    const { buildOrderIntentInWorker } = await import('../../services/analysisWorkerClient');
+    vi.mocked(buildOrderIntentInWorker).mockResolvedValueOnce({
+      intentId,
+      logId: `log_${Date.now()}`,
+      symbol: 'BTC_USDT',
+      mode: 'simulation' as const,
+      side: 'LONG' as const,
+      entry: 65000,
+      tp: 66300,
+      sl: 63700,
+      quantity: 0.01,
+      leverage: 10,
+      confidence: 75,
+      winRate: 55,
+      aiProvider: 'test',
+      createdAt: Date.now(),
+    });
+
+    const state = {
+      autoTradeMode: 'simulation' as const,
+      autoTradeRunning: true,
+      autoTradeConfig: {
+        minConfidence: 70,
+        riskPercentPerTrade: 1,
+        maxConcurrentOrders: 3,
+        dailyLossLimit: 50,
+        trailingStop: false,
+        newsFilter: false,
+        quietHours: null,
+        symbols: ['BTC_USDT'],
+        scanAllMarket: false,
+      },
+      autoTradeLogs: [recentLog],
+      pendingOrders: [],
+      tradeLessons: [] as string[],
+      credentials: null,
+      aiCredentials: null,
+      signals: {},
+      tickers: [
+        { symbol: 'BTC_USDT', lastPrice: 65000, bid1: 64990, ask1: 65010, volume24: 500000, amount24: 30000000, holdVol: 100000, lower24Price: 63000, high24Price: 67000, riseFallRate: 0.03, riseFallValue: 1950, indexPrice: 65000, fairPrice: 65000, fundingRate: 0.0001, timestamp: Date.now() },
+      ],
+      contracts: [{ symbol: 'BTC_USDT', contractSize: 0.01 }] as unknown as ContractInfo[],
+      news: [],
+      marketSentiment: 'NEUTRAL' as const,
+      accountBalance: null,
+      demoBalance: 10000,
+    };
+
+    const actions = {
+      setAutoTradeMode: vi.fn(),
+      setAutoTradeRunning: vi.fn(),
+      addAutoTradeLog: vi.fn(),
+      updateAutoTradeLog: vi.fn(),
+      addOrder: vi.fn(),
+      removeOrder: vi.fn(),
+      addTradeLesson: vi.fn(),
+      setSignal: vi.fn(),
+    };
+
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    };
+
+    const bot = new HeadlessBotService({
+      getState: () => state,
+      actions,
+      logger,
+      tickIntervalMs: 30000,
+      pnlCheckIntervalMs: 15000,
+    });
+
+    await bot.runSingleTick();
+
+    // Recent intent should be blocked → duplicate warning logged
+    const warnCalls = logger.warn.mock.calls;
+    const hasDupMsg = warnCalls.some((call: unknown[]) =>
+      typeof call[0] === 'string' && call[0].includes('Duplicate intent blocked')
+    );
+    expect(hasDupMsg).toBe(true);
   });
 });

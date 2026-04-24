@@ -1,6 +1,11 @@
 import os
+import sys
 import asyncio
+import traceback
 from typing import List
+
+# Suppress HuggingFace symlink warning on Windows
+os.environ.setdefault('HF_HUB_DISABLE_SYMLINKS_WARNING', '1')
 
 import numpy as np
 from dotenv import load_dotenv
@@ -11,6 +16,11 @@ from pydantic import BaseModel
 from routers.proxy_router import proxy_router
 
 load_dotenv()
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
 def resolve_allowed_origins() -> List[str]:
@@ -70,7 +80,7 @@ def load_model():
                 )
             )
             model_mode = "v2_5"
-            print("✅ TimesFM 2.5 model loaded successfully")
+            print("TimesFM 2.5 model loaded successfully")
             return
 
         # Fallback cho package timesfm 1.3.0 (API cũ)
@@ -88,9 +98,11 @@ def load_model():
             ),
         )
         model_mode = "legacy"
-        print("✅ TimesFM legacy model loaded successfully (timesfm 1.x API)")
+        print("TimesFM legacy model loaded successfully (timesfm 1.x API)")
     except Exception as e:
-        print("⚠️ Warning: Could not load TimesFM model locally. Please check your python environment and packages: ", e)
+        import traceback
+        print("Error: Could not load TimesFM model locally. Full traceback below:")
+        traceback.print_exc()
 
 
 class ForecastRequest(BaseModel):
@@ -176,4 +188,25 @@ def _run_inference(history: List[float], horizon: int) -> List[float]:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    # When spawned by Electron sidecar, disable reload to prevent
+    # uvicorn from re-importing the module and resetting global model state.
+    reload_mode = os.getenv('TIMESFM_RELOAD', '0') == '1'
+
+    # Windows often leaves sockets in TIME_WAIT after abrupt termination.
+    # Pre-bind with SO_REUSEADDR so uvicorn can reclaim the port immediately.
+    bind_port = int(os.getenv('TIMESFM_PORT', '8010'))
+    bind_host = '127.0.0.1'
+
+    if not reload_mode:
+        # Production/sidecar mode: direct Server for reliable binding
+        config = uvicorn.Config(
+            app,
+            host=bind_host,
+            port=bind_port,
+            log_level="info",
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    else:
+        # Dev mode with file watcher
+        uvicorn.run("main:app", host=bind_host, port=bind_port, reload=True)
